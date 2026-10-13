@@ -1,0 +1,306 @@
+// Saathi Teachers Programme (STP) 2027
+// Prisma Schema - PostgreSQL / SQLite Compatible
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+enum Role {
+  APPLICANT
+  REVIEWER
+  ADMIN
+}
+
+model User {
+  id                  String    @id @default(cuid())
+  name                String
+  email               String    @unique
+  username            String?   @unique
+  passwordHash        String
+  role                Role      @default(APPLICANT)
+  locale              String    @default("en") // "en" | "ne"
+  mustChangePassword  Boolean   @default(false)
+  isActive            Boolean   @default(true)
+  emailVerified       DateTime?
+  failedLoginAttempts Int       @default(0)
+  lockedUntil         DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  applications        Application[]
+  reviews             Review[]
+  reviewerAssignments ReviewerAssignment[] @relation("ReviewerAssignments")
+  assignedAssignments ReviewerAssignment[] @relation("AssignedBy")
+  stageHistories      StageHistory[]
+  notifications       Notification[]
+  auditLogs           AuditLog[]
+  sessions            Session[]
+  passwordResetCodes  PasswordResetCode[]
+  verificationCodes   VerificationCode[]
+  reviewerProfile     ReviewerProfile?
+  stageAssignments    StageAssignment[]
+  reviewBatches       ReviewBatch[]         @relation("ReviewerBatches")
+
+  @@index([email])
+  @@index([username])
+  @@index([role])
+}
+
+model Application {
+  id          String    @id @default(cuid())
+  refNo       String    @unique // e.g. STP-2027-0001
+  applicantId String
+  applicant   User      @relation(fields: [applicantId], references: [id], onDelete: Cascade)
+  year        Int       @default(2027)
+  seq         Int       @default(1)
+  status      String    @default("DRAFT") // DRAFT, SUBMITTED, SHORTLISTED, REJECTED, etc.
+  stage       String    @default("APPLICATION")
+  submittedAt DateTime?
+  draftData   Json?
+  data        Json?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  histories   StageHistory[]
+  reviews     Review[]
+  assignments ReviewerAssignment[]
+
+  @@index([applicantId])
+  @@index([refNo])
+  @@index([stage])
+  @@index([status])
+}
+
+model Stage {
+  id        String   @id @default(cuid())
+  code      String   @unique // APPLICATION, PHONE_INTERVIEW, ASC, PARENTS_MEET, SAATHI_SCHOOL, PLACEMENT
+  nameEn    String
+  nameNe    String
+  order     Int
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([order])
+}
+
+model StageHistory {
+  id            String      @id @default(cuid())
+  applicationId String
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  fromStage     String
+  toStage       String
+  actorId       String?
+  actor         User?       @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  note          String?
+  at            DateTime    @default(now())
+
+  @@index([applicationId])
+  @@index([actorId])
+}
+
+model Review {
+  id             String       @id @default(cuid())
+  applicationId  String
+  application    Application  @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  reviewerId     String
+  reviewer       User         @relation(fields: [reviewerId], references: [id], onDelete: Cascade)
+  batchId        String?
+  batch          ReviewBatch? @relation(fields: [batchId], references: [id], onDelete: SetNull)
+  stage          String
+  scores         Json // Rubric scores
+  totalScore     Float?
+  comment        String?
+  recommendation String // ADVANCE, HOLD, REJECT
+  status         String       @default("DRAFT") // DRAFT, SUBMITTED, APPROVED, RETURNED
+  isLocked       Boolean      @default(false)
+  unlockedReason String?
+  adminDecision  String?      // APPROVED, RETURNED
+  returnReason   String?
+  submittedAt    DateTime?
+  at             DateTime     @default(now())
+
+  @@unique([applicationId, reviewerId, stage])
+  @@index([applicationId])
+  @@index([reviewerId])
+  @@index([stage])
+  @@index([status])
+  @@index([batchId])
+}
+
+model ReviewerAssignment {
+  id            String      @id @default(cuid())
+  applicationId String
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  reviewerId    String
+  reviewer      User        @relation("ReviewerAssignments", fields: [reviewerId], references: [id], onDelete: Cascade)
+  assignedById  String?
+  assignedBy    User?       @relation("AssignedBy", fields: [assignedById], references: [id], onDelete: SetNull)
+  assignedAt    DateTime    @default(now())
+
+  @@unique([applicationId, reviewerId])
+  @@index([applicationId])
+  @@index([reviewerId])
+}
+
+model EmailTemplate {
+  id        String     @id @default(cuid())
+  code      String // SIGNUP_VERIFICATION, PASSWORD_RESET, APPLICATION_SUBMITTED, etc.
+  stage     String? // Associated stage if applicable
+  locale    String     @default("en") // "en" | "ne"
+  subject   String
+  body      String // Template body with placeholders
+  active    Boolean    @default(true)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  emailLogs EmailLog[]
+
+  @@unique([code, locale])
+  @@index([code])
+}
+
+model EmailLog {
+  id         String         @id @default(cuid())
+  to         String
+  templateId String?
+  template   EmailTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  subject    String?
+  status     String // PENDING, SENT, FAILED
+  error      String?
+  sentAt     DateTime       @default(now())
+
+  @@index([to])
+  @@index([status])
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  body      String
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@index([readAt])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  actorId   String?
+  actor     User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  role      String?
+  action    String // LOGIN, LOGOUT, REGISTER, PASSWORD_RESET_REQUEST, etc.
+  entity    String // User, Application, Stage, etc.
+  entityId  String?
+  meta      Json?
+  ip        String?
+  userAgent String?
+  at        DateTime @default(now())
+
+  @@index([actorId])
+  @@index([action])
+  @@index([entity])
+  @@index([at])
+}
+
+model Settings {
+  id         String   @id @default("default")
+  deadline   DateTime
+  cohortYear Int      @default(2027)
+  cycleLabel String   @default("Saathi Teachers Programme (STP) 2027")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+  lastActiveAt DateTime @default(now())
+
+  @@index([sessionToken])
+  @@index([userId])
+}
+
+model PasswordResetCode {
+  id        String   @id @default(cuid())
+  email     String
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  codeHash  String
+  expiresAt DateTime
+  attempts  Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([email])
+}
+
+model VerificationCode {
+  id        String   @id @default(cuid())
+  email     String
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  codeHash  String
+  expiresAt DateTime
+  attempts  Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([email])
+}
+
+model ReviewerProfile {
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  phone             String?
+  nameNe            String?
+  designation       String?
+  committeeRole     String?  @default("Reviewer")
+  blindReview       Boolean  @default(true)
+  assignedPositions String?  @default("ALL")
+  assignedStages    String?  @default("ALL")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model ReviewBatch {
+  id           String    @id @default(cuid())
+  reviewerId   String
+  reviewer     User      @relation("ReviewerBatches", fields: [reviewerId], references: [id], onDelete: Cascade)
+  status       String    @default("SUBMITTED") // SUBMITTED, APPROVED, RETURNED
+  submittedAt  DateTime  @default(now())
+  reviewedAt   DateTime?
+  adminNotes   String?
+  returnReason String?
+  reviews      Review[]
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([reviewerId])
+  @@index([status])
+}
+
+model StageAssignment {
+  id         String   @id @default(cuid())
+  reviewerId String
+  reviewer   User     @relation(fields: [reviewerId], references: [id], onDelete: Cascade)
+  stageCode  String
+  createdAt  DateTime @default(now())
+
+  @@unique([reviewerId, stageCode])
+  @@index([reviewerId])
+  @@index([stageCode])
+}
+
