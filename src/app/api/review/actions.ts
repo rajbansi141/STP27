@@ -89,11 +89,25 @@ export async function submitReviewAction(
 
     const application = await prisma.application.findUnique({
       where: { id: applicationId },
-      include: { applicant: true },
+      include: {
+        applicant: true,
+        assignments: true,
+      },
     });
 
     if (!application) {
       return { success: false, message: 'Application not found.' };
+    }
+
+    // RBAC: Reviewer must be assigned to this application
+    if (user.role === 'REVIEWER') {
+      const isAssigned = application.assignments.some((a) => a.reviewerId === user.id);
+      if (!isAssigned) {
+        return {
+          success: false,
+          message: 'Access restricted: You are not assigned to evaluate this candidate.',
+        };
+      }
     }
 
     const targetStage = stage || application.stage;
@@ -161,6 +175,165 @@ export async function submitReviewAction(
         savedReviewId = created.id;
       }
 
+      // Workflow progression based on recommendation:
+      // UPGRADE (ADVANCE) -> Moves candidate to next stage
+      // HOLD -> Puts candidate ON_HOLD
+      // REJECT -> Disqualifies candidate
+      if (recommendation === 'ADVANCE') {
+        const activeStages = await tx.stage.findMany({
+          where: { isActive: true },
+          orderBy: { order: 'asc' },
+        });
+
+        const currentIndex = activeStages.findIndex((s) => s.code === application.stage);
+        if (currentIndex !== -1 && currentIndex < activeStages.length - 1) {
+          const nextStage = activeStages[currentIndex + 1];
+
+          await tx.application.update({
+            where: { id: applicationId },
+            data: {
+              stage: nextStage.code,
+              status: 'SHORTLISTED',
+            },
+          });
+
+          await tx.stageHistory.create({
+            data: {
+              applicationId,
+              fromStage: application.stage,
+              toStage: nextStage.code,
+              actorId: user.id,
+              note: `Upgraded to ${nextStage.nameEn} following review evaluation (Score: ${totalScore}/40).`,
+            },
+          });
+
+          await tx.notification.create({
+            data: {
+              userId: application.applicantId,
+              title: `Application Advanced to ${nextStage.nameEn} / छनोट चरण स्तरोन्नति`,
+              body: `Congratulations! Your application (${application.refNo}) has successfully advanced to: ${nextStage.nameEn}.`,
+            },
+          });
+
+          // Bilingual Email
+          const isNe = application.applicant.locale === 'ne';
+          const emailSubject = isNe
+            ? `बधाई छ! तपाईंको आवेदन नयाँ चरणमा सिफारिस भएको छ (${application.refNo}) - साथी शिक्षक कार्यक्रम २०२७`
+            : `Congratulations! Application Advanced to ${nextStage.nameEn} (${application.refNo}) - STP 2027`;
+
+          const emailHtml = isNe
+            ? `
+              <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px;">
+                <h2 style="color: #166534;">साथी शिक्षक कार्यक्रम २०२७</h2>
+                <p>आदरणीय <strong>${application.applicant.name}</strong>,</p>
+                <p>बधाई छ! छनोट समितिद्वारा मूल्याङ्कन पश्चात् तपाईंको आवेदन (दर्ता नं: <strong>${application.refNo}</strong>) आगामी चरण <strong>${nextStage.nameNe} (${nextStage.nameEn})</strong> मा सिफारिस भएको छ।</p>
+                <p>तपाईंको ड्यासबोर्डमा नयाँ चरणको विवरण र आगामी प्रक्रियाहरू अपडेट गरिएको छ। कृपया आफ्नो ड्यासबोर्ड नियमित रूपमा अवलोकन गर्नुहोस्।</p>
+                <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
+                <p style="font-size: 12px; color: #64748b;">साथी शिक्षक कार्यक्रम (STP) २०२७ छनोट समिति</p>
+              </div>
+            `
+            : `
+              <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px;">
+                <h2 style="color: #166534;">Saathi Teachers Programme 2027</h2>
+                <p>Dear <strong>${application.applicant.name}</strong>,</p>
+                <p>Congratulations! Following review by the selection committee, your application (Ref: <strong>${application.refNo}</strong>) has successfully advanced to the next stage: <strong>${nextStage.nameEn}</strong>.</p>
+                <p>Your applicant dashboard has been updated with information about this upcoming stage.</p>
+                <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
+                <p style="font-size: 12px; color: #64748b;">Saathi Teachers Programme (STP) 2027 Selection Committee</p>
+              </div>
+            `;
+          sendEmail({ to: application.applicant.email, subject: emailSubject, html: emailHtml }).catch(console.error);
+        } else {
+          // Final stage reached
+          await tx.application.update({
+            where: { id: applicationId },
+            data: { status: 'FINAL_SELECTED' },
+          });
+
+          await tx.notification.create({
+            data: {
+              userId: application.applicantId,
+              title: 'Final Selection Confirmed / अन्तिम छनोट सम्पन्न',
+              body: `Congratulations! Your placement for Saathi Teachers Programme 2027 has been finalized.`,
+            },
+          });
+        }
+      } else if (recommendation === 'HOLD') {
+        await tx.application.update({
+          where: { id: applicationId },
+          data: { status: 'ON_HOLD' },
+        });
+
+        await tx.stageHistory.create({
+          data: {
+            applicationId,
+            fromStage: application.stage,
+            toStage: application.stage,
+            actorId: user.id,
+            note: `Application placed on hold during ${application.stage} evaluation.`,
+          },
+        });
+
+        await tx.notification.create({
+          data: {
+            userId: application.applicantId,
+            title: 'Application Status: Under Review / आवेदन समीक्षामा',
+            body: `Your application (${application.refNo}) has been placed on temporary hold for further committee deliberation.`,
+          },
+        });
+      } else if (recommendation === 'REJECT') {
+        await tx.application.update({
+          where: { id: applicationId },
+          data: { status: 'REJECTED' },
+        });
+
+        await tx.stageHistory.create({
+          data: {
+            applicationId,
+            fromStage: application.stage,
+            toStage: application.stage,
+            actorId: user.id,
+            note: `Candidate disqualified during ${application.stage} review.`,
+          },
+        });
+
+        await tx.notification.create({
+          data: {
+            userId: application.applicantId,
+            title: 'Application Status Update / आवेदन स्थिति जानकारी',
+            body: `Thank you for applying to STP 2027. Your application (${application.refNo}) has concluded for this cohort cycle.`,
+          },
+        });
+
+        const isNe = application.applicant.locale === 'ne';
+        const emailSubject = isNe
+          ? `आवेदन स्थिति जानकारी (${application.refNo}) - साथी शिक्षक कार्यक्रम २०२७`
+          : `Application Status Update (${application.refNo}) - STP 2027`;
+
+        const emailHtml = isNe
+          ? `
+            <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px;">
+              <h2 style="color: #166534;">साथी शिक्षक कार्यक्रम २०२७</h2>
+              <p>आदरणीय <strong>${application.applicant.name}</strong>,</p>
+              <p>साथी शिक्षक कार्यक्रम २०२७ मा आवेदन दिनुभएकोमा हार्दिक धन्यवाद। यस पटकको प्रतिस्पर्धात्मक छनोट प्रक्रियामा तपाईंको आवेदन अर्को चरणका लागि सिफारिस हुन नसकेको जानकारी गराउन चाहन्छौं।</p>
+              <p>तपाईंको आगामी शैक्षिक तथा व्यक्तिगत सफलताको हार्दिक शुभकामना व्यक्त गर्दछौं।</p>
+              <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
+              <p style="font-size: 12px; color: #64748b;">साथी शिक्षक कार्यक्रम (STP) २०२७ छनोट समिति</p>
+            </div>
+          `
+          : `
+            <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px;">
+              <h2 style="color: #166534;">Saathi Teachers Programme 2027</h2>
+              <p>Dear <strong>${application.applicant.name}</strong>,</p>
+              <p>Thank you for your interest and application to the Saathi Teachers Programme 2027. Due to high competition, we regret to inform you that your application was not selected to advance further in this cycle.</p>
+              <p>We deeply appreciate your passion for quality education in Nepal and wish you the very best in your future endeavors.</p>
+              <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
+              <p style="font-size: 12px; color: #64748b;">Saathi Teachers Programme (STP) 2027 Selection Committee</p>
+            </div>
+          `;
+        sendEmail({ to: application.applicant.email, subject: emailSubject, html: emailHtml }).catch(console.error);
+      }
+
       // Record in Audit Log
       await tx.auditLog.create({
         data: {
@@ -184,10 +357,13 @@ export async function submitReviewAction(
     revalidatePath('/review');
     revalidatePath(`/review/${applicationId}`);
     revalidatePath('/reviewer');
+    revalidatePath('/applicant');
+    revalidatePath('/dashboard');
+    revalidatePath('/admin/candidates');
 
     return {
       success: true,
-      message: 'Evaluation successfully submitted and locked for admin review.',
+      message: 'Evaluation submitted. Stage progression and notifications updated.',
     };
   } catch (err) {
     console.error('Submit review error:', err);

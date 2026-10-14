@@ -12,6 +12,7 @@ import {
   Award,
   CheckCircle2,
   AlertTriangle,
+  AlertCircle,
   Loader2,
   Lock,
   Unlock,
@@ -65,6 +66,7 @@ interface ScoringRubricProps {
   availableStages: { code: string; name: string }[];
   isReviewerOrAdmin: boolean;
   isAdmin?: boolean;
+  isAssignedReviewer?: boolean;
 }
 
 export function ScoringRubric({
@@ -76,6 +78,7 @@ export function ScoringRubric({
   availableStages,
   isReviewerOrAdmin,
   isAdmin = false,
+  isAssignedReviewer = true,
 }: ScoringRubricProps) {
   const { t, locale } = useI18n();
   const router = useRouter();
@@ -129,9 +132,9 @@ export function ScoringRubric({
   const [nextStage, setNextStage] = useState<string>(nextStageDefault);
   const [advanceNote, setAdvanceNote] = useState<string>('');
 
-  // Is evaluation locked for the reviewer?
-  // Locked if existingReview isLocked and user is NOT admin
-  const isLocked = Boolean(existingReview?.isLocked && !isAdmin);
+  // Is evaluation locked or in read-only review mode?
+  const isReadOnlyReview = !isAssignedReviewer && !isAdmin;
+  const isLocked = Boolean((existingReview?.isLocked && !isAdmin) || isReadOnlyReview);
   const isApproved = existingReview?.status === 'APPROVED' || existingReview?.adminDecision === 'APPROVED';
   const isReturned = existingReview?.status === 'RETURNED' || existingReview?.adminDecision === 'RETURNED';
 
@@ -589,8 +592,22 @@ export function ScoringRubric({
         </div>
       </div>
 
-      {/* Reviewer Submit & Lock Action */}
-      {!isLocked && (
+      {/* Reviewer Submit & Lock Action OR Dossier Review Mode Notice */}
+      {isReadOnlyReview ? (
+        <div className="p-3.5 rounded-xl border border-amber-300 dark:border-amber-800 bg-amber-50/80 dark:bg-amber-950/40 text-amber-900 dark:text-amber-200 text-xs space-y-1.5 shadow-xs">
+          <div className="flex items-center gap-2 font-semibold text-amber-800 dark:text-amber-300">
+            <AlertCircle className="h-4 w-4 shrink-0 text-amber-600" />
+            <span>
+              {locale === 'ne' ? 'अवलोकन मोड (Dossier Review Only)' : 'Review Mode (Unassigned Candidate)'}
+            </span>
+          </div>
+          <p className="text-[11px] leading-relaxed text-amber-700 dark:text-amber-300">
+            {locale === 'ne'
+              ? 'तपाईं यस उम्मेदवारको पूर्ण आवेदन तथा कागजातहरूको अध्ययन गर्न सक्नुहुन्छ। तर छनोट समिति नीति अनुसार, केवल तोकिएका समीक्षकले मात्र आधिकारिक मूल्याङ्कन दर्ता गरी व्यवस्थापकसमक्ष पेश गर्न सक्नुहुन्छ।'
+              : 'You are reviewing this candidate’s application dossier. Only the officially assigned reviewer can score the rubric and submit the final evaluation to the administrator.'}
+          </p>
+        </div>
+      ) : !isLocked ? (
         <button
           type="button"
           disabled={isPending || !comment.trim()}
@@ -611,7 +628,7 @@ export function ScoringRubric({
             </>
           )}
         </button>
-      )}
+      ) : null}
 
       {/* Admin Decision Section */}
       {isAdmin && existingReview?.id && (

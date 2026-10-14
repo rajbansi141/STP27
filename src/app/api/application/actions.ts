@@ -179,14 +179,29 @@ export async function submitApplicationAction(
         },
       });
 
-      // Notification
+      // 1. Notify applicant
       await tx.notification.create({
         data: {
           userId: user.id,
           title: `Application Submitted - ${refNo}`,
-          body: `Your application for Saathi Teachers Programme 2027 has been submitted. Reference: ${refNo}`,
+          body: `Your application for Saathi Teachers Programme 2027 has been successfully submitted and received. Reference: ${refNo}`,
         },
       });
+
+      // 2. Notify all active administrators
+      const activeAdmins = await tx.user.findMany({
+        where: { role: 'ADMIN', isActive: true },
+        select: { id: true },
+      });
+      for (const adm of activeAdmins) {
+        await tx.notification.create({
+          data: {
+            userId: adm.id,
+            title: `New Application Received - ${refNo}`,
+            body: `Candidate ${user.name} (${user.email}) has submitted an application for Saathi Teachers Programme 2027.`,
+          },
+        });
+      }
 
       return { app, refNo };
     });

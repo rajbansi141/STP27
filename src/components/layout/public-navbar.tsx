@@ -2,8 +2,9 @@
 
 import * as React from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { GraduationCap, Menu, ArrowRight } from 'lucide-react';
+import { Menu, ArrowRight } from 'lucide-react';
 import { buttonVariants } from '@/components/ui/button';
 import {
   Sheet,
@@ -45,12 +46,24 @@ export function PublicNavbar() {
     >
       <div className="container mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         {/* Brand Logo */}
-        <Link href="/" className="flex items-center gap-2.5 transition-opacity hover:opacity-90">
-          <div className="flex size-9 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-md shadow-emerald-600/20">
-            <GraduationCap className="size-5" />
+        <Link href="/" className="flex items-center gap-3 transition-opacity hover:opacity-90 group">
+          <div className="flex h-10 w-auto items-center">
+            <Image
+              src="/saathi-logo.png"
+              alt="Saathi Teachers Programme Logo"
+              width={130}
+              height={44}
+              className="h-9 w-auto object-contain dark:brightness-110"
+              priority
+            />
           </div>
-          <div className="flex flex-col">
-            <span className="font-bold text-base leading-none tracking-tight">STP 2027</span>
+          <div className="flex flex-col border-l border-stone-200 dark:border-stone-800 pl-3">
+            <div className="flex items-center gap-1.5">
+              <span className="font-bold text-sm leading-none tracking-tight">STP 2027</span>
+              <span className="rounded-full bg-emerald-100 dark:bg-emerald-950/80 px-1.5 py-0.2 text-[9px] font-semibold text-emerald-800 dark:text-emerald-300">
+                Nepal
+              </span>
+            </div>
             <span className="text-[11px] font-medium text-muted-foreground mt-0.5">
               {locale === 'ne' ? 'साथी शिक्षक कार्यक्रम' : 'Saathi Teachers Programme'}
             </span>
@@ -149,11 +162,22 @@ export function PublicNavbar() {
             </SheetTrigger>
             <SheetContent side="right" className="w-72 sm:w-80">
               <SheetHeader className="text-left pb-4 border-b">
-                <SheetTitle className="flex items-center gap-2">
-                  <div className="flex size-8 items-center justify-center rounded-lg bg-emerald-600 text-white">
-                    <GraduationCap className="size-4" />
+                <SheetTitle className="flex items-center gap-2.5">
+                  <div className="flex h-8 w-auto items-center">
+                    <Image
+                      src="/saathi-logo.png"
+                      alt="Saathi Teachers Programme Logo"
+                      width={100}
+                      height={36}
+                      className="h-7 w-auto object-contain dark:brightness-110"
+                    />
                   </div>
-                  <span>STP 2027</span>
+                  <div className="flex flex-col">
+                    <span className="text-sm font-bold leading-none">STP 2027</span>
+                    <span className="text-[10px] text-muted-foreground font-normal">
+                      {locale === 'ne' ? 'साथी शिक्षक' : 'Saathi Teachers'}
+                    </span>
+                  </div>
                 </SheetTitle>
               </SheetHeader>
               <div className="flex flex-col gap-4 py-6">

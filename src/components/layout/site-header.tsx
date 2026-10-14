@@ -77,7 +77,7 @@ export function SiteHeader({ role, deadlineDate }: SiteHeaderProps) {
     };
 
     fetchNotifications();
-    const interval = setInterval(fetchNotifications, 60000);
+    const interval = setInterval(fetchNotifications, 15000); // 15s responsive poll
     return () => {
       isMounted = false;
       clearInterval(interval);
@@ -242,26 +242,35 @@ export function SiteHeader({ role, deadlineDate }: SiteHeaderProps) {
               )}
             </div>
             <DropdownMenuSeparator />
-            <div className="max-h-64 overflow-y-auto space-y-1 py-1">
+            <div className="max-h-72 overflow-y-auto space-y-1.5 py-1">
               {notifications.length === 0 ? (
-                <p className="py-4 text-center text-xs text-muted-foreground">
+                <p className="py-6 text-center text-xs text-muted-foreground">
                   {t?.notifications?.empty || 'No notifications'}
                 </p>
               ) : (
-                notifications.slice(0, 4).map((n) => (
+                notifications.slice(0, 10).map((n) => (
                   <div
                     key={n.id}
-                    className={`rounded-md p-2 text-xs transition-colors ${
-                      !n.readAt ? 'bg-primary/5 font-medium' : 'hover:bg-muted/50'
+                    className={`rounded-xl p-2.5 text-xs transition-colors border ${
+                      !n.readAt
+                        ? 'bg-emerald-50/70 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800/60 font-medium'
+                        : 'bg-card hover:bg-muted/50 border-transparent'
                     }`}
                   >
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold truncate">{n.title}</span>
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="font-bold text-stone-900 dark:text-stone-100 truncate">{n.title}</span>
                       {!n.readAt && (
-                        <span className="h-1.5 w-1.5 rounded-full bg-primary shrink-0" />
+                        <span className="h-2 w-2 rounded-full bg-emerald-600 shrink-0" />
                       )}
                     </div>
-                    <p className="text-muted-foreground line-clamp-2 mt-0.5">{n.message}</p>
+                    <p className="text-stone-600 dark:text-stone-300 text-[11px] line-clamp-2 mt-1 leading-snug">
+                      {n.body || n.message}
+                    </p>
+                    {n.createdAt && (
+                      <span className="text-[10px] text-stone-400 font-mono mt-1 block">
+                        {new Date(n.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    )}
                   </div>
                 ))
               )}

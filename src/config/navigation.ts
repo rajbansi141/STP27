@@ -18,6 +18,11 @@ import {
   User,
   CheckCircle2,
   ListTodo,
+  Layers,
+  PhoneCall,
+  Award,
+  School,
+  MapPin,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -43,32 +48,54 @@ export interface NavGroup {
 export const navigationConfig: Record<'admin' | 'reviewer' | 'applicant', NavGroup[]> = {
   admin: [
     {
-      labelKey: 'nav.overview',
+      labelKey: 'nav.recruitment',
       items: [
         {
           titleKey: 'nav.dashboard',
           href: '/admin',
           icon: LayoutDashboard,
         },
-      ],
-    },
-    {
-      labelKey: 'nav.recruitment',
-      items: [
         {
           titleKey: 'nav.applicants',
           href: '/admin/candidates',
           icon: Users,
         },
         {
-          titleKey: 'nav.pipeline',
-          href: '/admin/settings',
-          icon: Workflow,
+          titleKey: 'nav.stageProgression',
+          href: '/admin/candidates',
+          icon: Layers,
+          badge: 'Pipeline',
+          items: [
+            {
+              titleKey: 'nav.stageApplication',
+              href: '/admin/candidates?stage=APPLICATION',
+            },
+            {
+              titleKey: 'nav.stagePhone',
+              href: '/admin/candidates?stage=PHONE_INTERVIEW',
+            },
+            {
+              titleKey: 'nav.stageAsc',
+              href: '/admin/candidates?stage=ASC',
+            },
+            {
+              titleKey: 'nav.stageParents',
+              href: '/admin/candidates?stage=PARENTS_MEET',
+            },
+            {
+              titleKey: 'nav.stageSaathiSchool',
+              href: '/admin/candidates?stage=SAATHI_SCHOOL',
+            },
+            {
+              titleKey: 'nav.stagePlacement',
+              href: '/admin/candidates?stage=PLACEMENT',
+            },
+          ],
         },
       ],
     },
     {
-      labelKey: 'nav.people',
+      labelKey: 'nav.evaluation',
       items: [
         {
           titleKey: 'nav.committee',
@@ -80,36 +107,31 @@ export const navigationConfig: Record<'admin' | 'reviewer' | 'applicant', NavGro
           href: '/admin/committee/activity',
           icon: Activity,
         },
-        {
-          titleKey: 'nav.people',
-          href: '/admin/users',
-          icon: Users,
-        },
       ],
     },
     {
       labelKey: 'nav.communication',
       items: [
         {
-          titleKey: 'nav.emailTemplates',
+          titleKey: 'nav.emailHub',
           href: '/admin/templates',
           icon: Mail,
         },
       ],
     },
     {
-      labelKey: 'nav.data',
+      labelKey: 'nav.systemSecurity',
       items: [
+        {
+          titleKey: 'nav.people',
+          href: '/admin/users',
+          icon: Users,
+        },
         {
           titleKey: 'nav.auditLogs',
           href: '/admin/audit',
           icon: ShieldAlert,
         },
-      ],
-    },
-    {
-      labelKey: 'nav.system',
-      items: [
         {
           titleKey: 'nav.settings',
           href: '/admin/settings',
@@ -131,6 +153,38 @@ export const navigationConfig: Record<'admin' | 'reviewer' | 'applicant', NavGro
           titleKey: 'nav.evaluations',
           href: '/review',
           icon: CheckCircle2,
+        },
+        {
+          titleKey: 'nav.stageProgression',
+          href: '/review',
+          icon: Workflow,
+          badge: 'Pipeline',
+          items: [
+            {
+              titleKey: 'nav.stageApplication',
+              href: '/review?stage=APPLICATION',
+            },
+            {
+              titleKey: 'nav.stagePhone',
+              href: '/review?stage=PHONE_INTERVIEW',
+            },
+            {
+              titleKey: 'nav.stageAsc',
+              href: '/review?stage=ASC',
+            },
+            {
+              titleKey: 'nav.stageParents',
+              href: '/review?stage=PARENTS_MEET',
+            },
+            {
+              titleKey: 'nav.stageSaathiSchool',
+              href: '/review?stage=SAATHI_SCHOOL',
+            },
+            {
+              titleKey: 'nav.stagePlacement',
+              href: '/review?stage=PLACEMENT',
+            },
+          ],
         },
       ],
     },

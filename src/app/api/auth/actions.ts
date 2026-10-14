@@ -93,7 +93,12 @@ export async function loginAction(
   const user = await prisma.user.findFirst({
     where: isEmail
       ? { email: normalizedIdentifier }
-      : { username: identifier.trim() },
+      : {
+          OR: [
+            { username: identifier.trim() },
+            { username: normalizedIdentifier },
+          ],
+        },
   });
 
   const locale = await getServerLocale();
@@ -161,7 +166,17 @@ export async function loginAction(
     redirect('/change-password');
   }
 
-  const targetPath = returnUrl && returnUrl.startsWith('/') ? returnUrl : '/dashboard';
+  let defaultPath = '/dashboard';
+  if (user.role === 'ADMIN') {
+    defaultPath = '/admin';
+  } else if (user.role === 'REVIEWER') {
+    defaultPath = '/reviewer';
+  }
+
+  const targetPath =
+    returnUrl && returnUrl.startsWith('/') && returnUrl !== '/dashboard'
+      ? returnUrl
+      : defaultPath;
   redirect(targetPath);
 }
 
@@ -205,10 +220,36 @@ export async function signupAction(
   }
 
   const passwordHash = await hashPassword(password);
+
+  // Generate lastname_firstname username for applicant
+  const nameParts = name.trim().split(/\s+/).filter(Boolean);
+  let baseUsername = '';
+  if (nameParts.length >= 2) {
+    const firstName = nameParts[0].toLowerCase().replace(/[^a-z0-9]/g, '');
+    const lastName = nameParts[nameParts.length - 1].toLowerCase().replace(/[^a-z0-9]/g, '');
+    baseUsername = `${lastName}_${firstName}`;
+  } else if (nameParts.length === 1) {
+    baseUsername = nameParts[0].toLowerCase().replace(/[^a-z0-9]/g, '');
+  } else {
+    baseUsername = 'applicant';
+  }
+
+  let uniqueUsername = baseUsername;
+  let uCounter = 1;
+  while (true) {
+    const uExisting = await prisma.user.findFirst({
+      where: { username: uniqueUsername },
+    });
+    if (!uExisting) break;
+    uniqueUsername = `${baseUsername}_${uCounter}`;
+    uCounter++;
+  }
+
   const user = await prisma.user.create({
     data: {
       name,
       email,
+      username: uniqueUsername,
       passwordHash,
       role: 'APPLICANT',
       locale,

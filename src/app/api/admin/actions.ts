@@ -559,3 +559,452 @@ export async function flushOutboxAction(): Promise<{
   }
 }
 
+/**
+ * Auto-assigns applications to active reviewers in a balanced / round-robin manner.
+ * Supports filtering by target stage and unassigned status.
+ * RBAC: ADMIN only.
+ */
+export async function autoAssignReviewersAction({
+  stageCode,
+  onlyUnassigned = true,
+}: {
+  stageCode?: string;
+  onlyUnassigned?: boolean;
+}): Promise<AdminActionState & { assignedCount?: number }> {
+  try {
+    const admin = await getCurrentUser();
+    if (!admin || admin.role !== 'ADMIN') {
+      return { success: false, message: 'Unauthorized. Admin credentials required.' };
+    }
+
+    // 1. Fetch active reviewers
+    const activeReviewers = await prisma.user.findMany({
+      where: { role: 'REVIEWER', isActive: true },
+      select: { id: true, name: true, email: true },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    if (activeReviewers.length === 0) {
+      return {
+        success: false,
+        message: 'No active reviewers available in the committee. Please activate reviewers first.',
+      };
+    }
+
+    // 2. Fetch target applications (not draft)
+    const applications = await prisma.application.findMany({
+      where: {
+        status: { not: 'DRAFT' },
+        ...(stageCode && stageCode !== 'ALL' ? { stage: stageCode } : {}),
+        ...(onlyUnassigned ? { assignments: { none: {} } } : {}),
+      },
+      include: {
+        applicant: true,
+        assignments: true,
+      },
+      orderBy: { submittedAt: 'asc' },
+    });
+
+    if (applications.length === 0) {
+      return {
+        success: false,
+        message: onlyUnassigned
+          ? `No unassigned candidates found${stageCode && stageCode !== 'ALL' ? ` in stage ${stageCode}` : ''}.`
+          : 'No candidate applications found to assign.',
+      };
+    }
+
+    // 3. Count current assignments per reviewer to balance workloads
+    const reviewerWorkloads = await prisma.reviewerAssignment.groupBy({
+      by: ['reviewerId'],
+      _count: { applicationId: true },
+    });
+
+    const workloadMap = new Map<string, number>();
+    activeReviewers.forEach((r) => workloadMap.set(r.id, 0));
+    reviewerWorkloads.forEach((w) => {
+      if (workloadMap.has(w.reviewerId)) {
+        workloadMap.set(w.reviewerId, w._count.applicationId);
+      }
+    });
+
+    // 4. Distribute applications evenly (selecting reviewer with minimum current assignments)
+    const assignmentsToCreate: { applicationId: string; reviewerId: string; assignedById: string }[] = [];
+    const notificationMap = new Map<string, number>();
+
+    // Copy array for mutable sorting
+    const sortedReviewers = [...activeReviewers];
+
+    for (const app of applications) {
+      // Sort reviewers by current workload ascending
+      sortedReviewers.sort((a, b) => (workloadMap.get(a.id) || 0) - (workloadMap.get(b.id) || 0));
+      const chosenReviewer = sortedReviewers[0];
+
+      // Avoid duplicate assignment if not onlyUnassigned
+      const alreadyAssigned = app.assignments.some((a) => a.reviewerId === chosenReviewer.id);
+      if (!alreadyAssigned) {
+        assignmentsToCreate.push({
+          applicationId: app.id,
+          reviewerId: chosenReviewer.id,
+          assignedById: admin.id,
+        });
+
+        // Increment workload counter
+        workloadMap.set(chosenReviewer.id, (workloadMap.get(chosenReviewer.id) || 0) + 1);
+        notificationMap.set(chosenReviewer.id, (notificationMap.get(chosenReviewer.id) || 0) + 1);
+      }
+    }
+
+    if (assignmentsToCreate.length === 0) {
+      return {
+        success: false,
+        message: 'All matching applications are already allocated to the available reviewers.',
+      };
+    }
+
+    await prisma.$transaction(async (tx) => {
+      // Batch create assignments using upsert
+      for (const item of assignmentsToCreate) {
+        await tx.reviewerAssignment.upsert({
+          where: {
+            applicationId_reviewerId: {
+              applicationId: item.applicationId,
+              reviewerId: item.reviewerId,
+            },
+          },
+          create: item,
+          update: {
+            assignedById: admin.id,
+            assignedAt: new Date(),
+          },
+        });
+      }
+
+      // Notify reviewers who received new candidates
+      for (const [reviewerId, count] of notificationMap.entries()) {
+        await tx.notification.create({
+          data: {
+            userId: reviewerId,
+            title: `New Candidates Assigned (${count})`,
+            body: `You have been allocated ${count} candidate applications${stageCode && stageCode !== 'ALL' ? ` in ${stageCode}` : ''} for review.`,
+          },
+        });
+      }
+
+      // Audit Log
+      await tx.auditLog.create({
+        data: {
+          actorId: admin.id,
+          role: admin.role,
+          action: 'AUTO_ASSIGN_REVIEWERS',
+          entity: 'ReviewerAssignment',
+          meta: JSON.stringify({
+            stage: stageCode || 'ALL',
+            totalApplicationsAssigned: assignmentsToCreate.length,
+            reviewersCount: activeReviewers.length,
+          }),
+        },
+      });
+    });
+
+    revalidatePath('/admin/candidates');
+    revalidatePath('/review');
+    revalidatePath('/reviewer');
+
+    return {
+      success: true,
+      assignedCount: assignmentsToCreate.length,
+      message: `Successfully allocated ${assignmentsToCreate.length} candidate(s) evenly across ${activeReviewers.length} reviewer(s).`,
+    };
+  } catch (err) {
+    console.error('Auto-assign error:', err);
+    return { success: false, message: 'Server error during auto-assignment.' };
+  }
+}
+
+/**
+ * Manually assigns a batch of candidates to a specific reviewer.
+ * RBAC: ADMIN only.
+ */
+export async function batchAssignReviewerAction({
+  applicationIds,
+  reviewerId,
+}: {
+  applicationIds: string[];
+  reviewerId: string;
+}): Promise<AdminActionState> {
+  try {
+    const admin = await getCurrentUser();
+    if (!admin || admin.role !== 'ADMIN') {
+      return { success: false, message: 'Unauthorized.' };
+    }
+
+    if (!applicationIds || applicationIds.length === 0) {
+      return { success: false, message: 'No candidates selected for assignment.' };
+    }
+
+    const reviewer = await prisma.user.findUnique({
+      where: { id: reviewerId },
+    });
+
+    if (!reviewer || reviewer.role !== 'REVIEWER') {
+      return { success: false, message: 'Invalid reviewer selected.' };
+    }
+
+    await prisma.$transaction(async (tx) => {
+      for (const appId of applicationIds) {
+        await tx.reviewerAssignment.upsert({
+          where: {
+            applicationId_reviewerId: {
+              applicationId: appId,
+              reviewerId,
+            },
+          },
+          create: {
+            applicationId: appId,
+            reviewerId,
+            assignedById: admin.id,
+          },
+          update: {
+            assignedById: admin.id,
+            assignedAt: new Date(),
+          },
+        });
+      }
+
+      // Notify the reviewer
+      await tx.notification.create({
+        data: {
+          userId: reviewerId,
+          title: `Candidates Assigned (${applicationIds.length})`,
+          body: `You have been allocated ${applicationIds.length} candidate(s) by administrator for review.`,
+        },
+      });
+
+      // Audit Log
+      await tx.auditLog.create({
+        data: {
+          actorId: admin.id,
+          role: admin.role,
+          action: 'BATCH_ASSIGN_REVIEWER',
+          entity: 'ReviewerAssignment',
+          meta: JSON.stringify({
+            reviewerId,
+            reviewerName: reviewer.name,
+            count: applicationIds.length,
+            applicationIds,
+          }),
+        },
+      });
+    });
+
+    revalidatePath('/admin/candidates');
+    revalidatePath('/review');
+    revalidatePath('/reviewer');
+
+    return {
+      success: true,
+      message: `Successfully assigned ${applicationIds.length} candidate(s) to ${reviewer.name}.`,
+    };
+  } catch (err) {
+    console.error('Batch assign error:', err);
+    return { success: false, message: 'Server error during batch assignment.' };
+  }
+}
+
+/**
+ * Unassigns a specific reviewer or all reviewers from a single application.
+ * RBAC: ADMIN only.
+ */
+export async function unassignReviewerAction({
+  applicationId,
+  reviewerId,
+}: {
+  applicationId: string;
+  reviewerId?: string;
+}): Promise<AdminActionState> {
+  try {
+    const admin = await getCurrentUser();
+    if (!admin || admin.role !== 'ADMIN') {
+      return { success: false, message: 'Unauthorized. Admin credentials required.' };
+    }
+
+    const whereClause: { applicationId: string; reviewerId?: string } = { applicationId };
+    if (reviewerId) {
+      whereClause.reviewerId = reviewerId;
+    }
+
+    const deleted = await prisma.reviewerAssignment.deleteMany({
+      where: whereClause,
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        actorId: admin.id,
+        role: admin.role,
+        action: 'UNASSIGN_REVIEWER',
+        entity: 'ReviewerAssignment',
+        meta: JSON.stringify({
+          applicationId,
+          reviewerId: reviewerId || 'ALL',
+          deletedCount: deleted.count,
+        }),
+      },
+    });
+
+    revalidatePath('/admin/candidates');
+    revalidatePath('/review');
+    revalidatePath('/reviewer');
+
+    return {
+      success: true,
+      message: reviewerId
+        ? 'Reviewer successfully unassigned.'
+        : 'All reviewer allocations removed for this candidate.',
+    };
+  } catch (err) {
+    console.error('Unassign reviewer error:', err);
+    return { success: false, message: 'Server error removing reviewer assignment.' };
+  }
+}
+
+/**
+ * Batch unassigns reviewers from multiple applications.
+ * RBAC: ADMIN only.
+ */
+export async function batchUnassignReviewersAction({
+  applicationIds,
+  reviewerId,
+}: {
+  applicationIds: string[];
+  reviewerId?: string;
+}): Promise<AdminActionState> {
+  try {
+    const admin = await getCurrentUser();
+    if (!admin || admin.role !== 'ADMIN') {
+      return { success: false, message: 'Unauthorized. Admin credentials required.' };
+    }
+
+    if (!applicationIds || applicationIds.length === 0) {
+      return { success: false, message: 'No candidates selected for unassignment.' };
+    }
+
+    const whereClause: { applicationId: { in: string[] }; reviewerId?: string } = {
+      applicationId: { in: applicationIds },
+    };
+    if (reviewerId) {
+      whereClause.reviewerId = reviewerId;
+    }
+
+    const deleted = await prisma.reviewerAssignment.deleteMany({
+      where: whereClause,
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        actorId: admin.id,
+        role: admin.role,
+        action: 'BATCH_UNASSIGN_REVIEWERS',
+        entity: 'ReviewerAssignment',
+        meta: JSON.stringify({
+          applicationIds,
+          reviewerId: reviewerId || 'ALL',
+          deletedCount: deleted.count,
+        }),
+      },
+    });
+
+    revalidatePath('/admin/candidates');
+    revalidatePath('/review');
+    revalidatePath('/reviewer');
+
+    return {
+      success: true,
+      message: `Successfully removed assignments for ${deleted.count} allocation(s).`,
+    };
+  } catch (err) {
+    console.error('Batch unassign error:', err);
+    return { success: false, message: 'Server error during batch unassignment.' };
+  }
+}
+
+/**
+ * Updates application status (e.g. SHORTLISTED, ON_HOLD, REJECTED, FINAL_SELECTED)
+ * RBAC: ADMIN only.
+ */
+export async function adminUpdateStatusAction({
+  applicationId,
+  status,
+  note,
+}: {
+  applicationId: string;
+  status: string;
+  note?: string;
+}): Promise<AdminActionState> {
+  try {
+    const admin = await getCurrentUser();
+    if (!admin || admin.role !== 'ADMIN') {
+      return { success: false, message: 'Unauthorized. Admin credentials required.' };
+    }
+
+    const application = await prisma.application.findUnique({
+      where: { id: applicationId },
+      include: { applicant: true },
+    });
+
+    if (!application) {
+      return { success: false, message: 'Application not found.' };
+    }
+
+    const previousStatus = application.status;
+
+    await prisma.$transaction(async (tx) => {
+      await tx.application.update({
+        where: { id: applicationId },
+        data: { status },
+      });
+
+      await tx.stageHistory.create({
+        data: {
+          applicationId,
+          fromStage: application.stage,
+          toStage: application.stage,
+          actorId: admin.id,
+          note: note || `Status changed from ${previousStatus} to ${status} by Administrator`,
+        },
+      });
+
+      await tx.notification.create({
+        data: {
+          userId: application.applicantId,
+          title: `Application Status Updated: ${status}`,
+          body: `Your application (${application.refNo}) status has been updated to: ${status}.`,
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          actorId: admin.id,
+          role: admin.role,
+          action: 'ADMIN_UPDATE_STATUS',
+          entity: 'Application',
+          entityId: applicationId,
+          meta: JSON.stringify({
+            refNo: application.refNo,
+            fromStatus: previousStatus,
+            toStatus: status,
+            note,
+          }),
+        },
+      });
+    });
+
+    revalidatePath('/admin');
+    revalidatePath('/admin/candidates');
+    revalidatePath(`/admin/candidates/${applicationId}`);
+    return { success: true, message: `Application status updated to ${status}.` };
+  } catch (err) {
+    console.error('Update status error:', err);
+    return { success: false, message: 'Server error updating status.' };
+  }
+}

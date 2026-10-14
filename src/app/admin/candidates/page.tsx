@@ -6,8 +6,16 @@ import {
   type AdminCandidateRow,
 } from '@/components/admin/AdminCandidatesTable';
 
-export default async function AdminCandidatesPage() {
+interface AdminCandidatesPageProps {
+  searchParams?: Promise<{
+    stage?: string;
+  }>;
+}
+
+export default async function AdminCandidatesPage({ searchParams }: AdminCandidatesPageProps) {
   const { t, locale } = await getServerTranslations();
+  const params = searchParams ? await searchParams : undefined;
+  const initialStage = params?.stage || 'ALL';
 
   const [applications, stages, reviewers] = await Promise.all([
     prisma.application.findMany({
@@ -72,21 +80,32 @@ export default async function AdminCandidatesPage() {
     name: locale === 'ne' ? s.nameNe : s.nameEn,
   }));
 
+  // Count candidates per stage
+  const stageCounts: Record<string, number> = {};
+  applications.forEach((app) => {
+    stageCounts[app.stage] = (stageCounts[app.stage] || 0) + 1;
+  });
+
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-xl font-heading font-extrabold text-stone-900 dark:text-stone-50">
-          {t.admin.candidates.title}
-        </h2>
-        <p className="text-xs sm:text-sm text-stone-500 mt-0.5">
-          {t.admin.candidates.subtitle}
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-heading font-extrabold text-stone-900 dark:text-stone-50">
+            {t.admin.candidates.title}
+          </h1>
+          <p className="text-xs sm:text-sm text-stone-500 mt-0.5">
+            {t.admin.candidates.subtitle}
+          </p>
+        </div>
       </div>
 
       <AdminCandidatesTable
         candidates={candidateRows}
         stages={availableStages}
         reviewers={reviewers}
+        initialStage={initialStage}
+        stageCounts={stageCounts}
+        totalCount={applications.length}
       />
     </div>
   );

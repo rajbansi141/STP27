@@ -12,12 +12,13 @@ export default async function ReviewLayout({
   return (
     <DashboardShell
       user={{
-        name: currentUser.name || 'Reviewer',
+        name: currentUser.name || (currentUser.role === 'ADMIN' ? 'System Admin' : 'Reviewer'),
         email: currentUser.email,
-        role: 'REVIEWER',
+        role: currentUser.role as 'ADMIN' | 'REVIEWER',
       }}
     >
       {children}
     </DashboardShell>
   );
 }
+

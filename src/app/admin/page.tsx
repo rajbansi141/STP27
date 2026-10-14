@@ -15,6 +15,8 @@ import {
   Activity,
   Layers,
   BookOpen,
+  Mail,
+  Settings,
 } from 'lucide-react';
 
 export default async function AdminOverviewPage() {
@@ -123,7 +125,53 @@ export default async function AdminOverviewPage() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
+      {/* Executive Header & Operations Toolbar */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-1 border-b border-stone-200/80 dark:border-stone-800/80">
+        <div>
+          <h1 className="text-2xl font-bold font-heading text-stone-900 dark:text-stone-50">
+            {t.admin.portalTitle || 'Executive Overview'}
+          </h1>
+          <p className="text-xs sm:text-sm text-stone-500 mt-0.5">
+            {locale === 'ne'
+              ? 'साथी शिक्षक कार्यक्रम २०२७ को भर्ना तथा छनोट नियन्त्रण केन्द्र'
+              : 'Saathi Teachers Programme Cohort 2027 Operations & Selection Management'}
+          </p>
+        </div>
+
+        {/* Quick Operational Shortcuts */}
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href="/admin/candidates"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-xs transition-colors"
+          >
+            <Users className="size-3.5" />
+            <span>{t.admin.nav.candidates}</span>
+          </Link>
+          <Link
+            href="/admin/committee"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 hover:bg-stone-50 dark:hover:bg-stone-800 text-stone-700 dark:text-stone-200 text-xs font-semibold shadow-xs transition-colors"
+          >
+            <UserCheck className="size-3.5 text-emerald-600" />
+            <span>{t.nav.committee || 'Selection Committee'}</span>
+          </Link>
+          <Link
+            href="/admin/templates"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 hover:bg-stone-50 dark:hover:bg-stone-800 text-stone-700 dark:text-stone-200 text-xs font-semibold shadow-xs transition-colors"
+          >
+            <Mail className="size-3.5 text-teal-600" />
+            <span>{t.admin.nav.templates}</span>
+          </Link>
+          <Link
+            href="/admin/settings"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 hover:bg-stone-50 dark:hover:bg-stone-800 text-stone-700 dark:text-stone-200 text-xs font-semibold shadow-xs transition-colors"
+          >
+            <Settings className="size-3.5 text-stone-500" />
+            <span>{t.admin.nav.settings}</span>
+          </Link>
+        </div>
+      </div>
+
       {/* 6 Executive KPI Metric Cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3.5">
         {/* Total Applicants */}
@@ -217,27 +265,32 @@ export default async function AdminOverviewPage() {
             </Link>
           </div>
 
-          <div className="space-y-3.5 pt-2">
-            {stageDistribution.map((stg, idx) => (
-              <div key={stg.code} className="space-y-1.5">
+          <div className="space-y-2 pt-1">
+            {stageDistribution.map((stg) => (
+              <Link
+                key={stg.code}
+                href={`/admin/candidates?stage=${stg.code}`}
+                className="group block space-y-1.5 p-2 rounded-xl transition-colors hover:bg-stone-50 dark:hover:bg-stone-800/60"
+              >
                 <div className="flex items-center justify-between text-xs font-semibold">
-                  <span className="text-stone-800 dark:text-stone-200">
-                    {idx + 1}. {stg.name}
+                  <span className="text-stone-800 dark:text-stone-200 group-hover:text-emerald-700 dark:group-hover:text-emerald-400 transition-colors">
+                    {stg.name}
                   </span>
                   <div className="flex items-center gap-2 text-stone-500">
                     <span className="font-mono font-bold text-stone-900 dark:text-stone-100">
                       {locale === 'ne' ? toNepaliDigits(stg.count) : stg.count}
                     </span>
                     <span className="text-[11px] text-stone-400">({stg.percentage}%)</span>
+                    <ArrowRight className="size-3 opacity-0 group-hover:opacity-100 text-emerald-600 transition-opacity" />
                   </div>
                 </div>
                 <div className="w-full h-2.5 rounded-full bg-stone-100 dark:bg-stone-800 overflow-hidden">
                   <div
-                    className="h-full rounded-full bg-gradient-to-r from-emerald-600 to-teal-500 transition-all duration-500"
+                    className="h-full rounded-full bg-gradient-to-r from-emerald-600 to-teal-500 transition-all duration-500 group-hover:brightness-105"
                     style={{ width: `${Math.max(stg.percentage, 2)}%` }}
                   />
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         </div>

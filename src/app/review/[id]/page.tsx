@@ -1,4 +1,4 @@
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import Link from 'next/link';
 import { requireRole } from '@/lib/auth/rbac';
 import { getServerTranslations } from '@/lib/i18n/server';
@@ -22,6 +22,8 @@ import {
   Phone,
   Mail,
   Download,
+  Lock,
+  ShieldAlert,
 } from 'lucide-react';
 
 interface ReviewDetailPageProps {
@@ -57,6 +59,10 @@ export default async function ReviewDetailPage({ params }: ReviewDetailPageProps
     notFound();
   }
 
+  // Reviewer assignment state (Admins have full superuser rights)
+  const isAssigned = application.assignments.some((a) => a.reviewerId === currentUser.id);
+  const isAssignedReviewer = currentUser.role === 'ADMIN' || isAssigned;
+
   // Audit log reviewer viewing application dossier
   await trackReviewerViewAction(application.id);
 
@@ -91,8 +97,9 @@ export default async function ReviewDetailPage({ params }: ReviewDetailPageProps
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-stone-200 dark:border-stone-800">
         <div className="flex items-center gap-3">
           <Link
-            href="/review"
+            href={currentUser.role === 'ADMIN' ? '/admin/candidates' : '/review'}
             className="p-2 rounded-xl border border-stone-200 dark:border-stone-800 hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors text-stone-600 dark:text-stone-300"
+            title={currentUser.role === 'ADMIN' ? 'Back to Admin Candidates' : 'Back to Review Queue'}
           >
             <ArrowLeft className="h-4 w-4" />
           </Link>
@@ -130,6 +137,23 @@ export default async function ReviewDetailPage({ params }: ReviewDetailPageProps
           )}
         </div>
       </div>
+
+      {/* Unassigned Candidate Review Info Banner */}
+      {!isAssignedReviewer && (
+        <div className="flex items-start sm:items-center gap-3 p-3.5 rounded-2xl border border-blue-200 dark:border-blue-900/60 bg-blue-50/70 dark:bg-blue-950/40 text-blue-950 dark:text-blue-200 text-xs shadow-2xs">
+          <BookOpen className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5 sm:mt-0" />
+          <div className="flex-1">
+            <span className="font-bold">
+              {locale === 'ne' ? 'खुला अवलोकन मोड (Open Review Mode): ' : 'Open Review Mode: '}
+            </span>
+            <span className="text-blue-800 dark:text-blue-300">
+              {locale === 'ne'
+                ? 'तपाईं यस उम्मेदवारको सम्पूर्ण विवरण र कागजातहरू अध्ययन गर्न सक्नुहुन्छ। तर आधिकारिक मूल्याङ्कन अंक दर्ता गरी व्यवस्थापकसमक्ष पेश गर्ने अधिकार तोकिएका समीक्षकलाई मात्र सुरक्षित छ।'
+                : 'You are reviewing this candidate dossier. Official rubric scoring and submission to the administrator is reserved for the assigned reviewer.'}
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Main 2-Column Split: Dossier (Left) vs. Scoring Rubric (Right) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
@@ -392,6 +416,7 @@ export default async function ReviewDetailPage({ params }: ReviewDetailPageProps
             availableStages={availableStages}
             isReviewerOrAdmin={true}
             isAdmin={currentUser.role === 'ADMIN'}
+            isAssignedReviewer={isAssignedReviewer}
           />
         </div>
       </div>

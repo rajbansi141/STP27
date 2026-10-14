@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   Users,
@@ -10,6 +11,7 @@ import {
   Clock,
   Sparkles,
   FileSpreadsheet,
+  Activity,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { CommitteeTable, type CommitteeMemberRow } from './CommitteeTable';
@@ -61,12 +63,19 @@ export function CommitteePageClient({
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <Link
+            href="/admin/committee/activity"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 hover:bg-stone-50 dark:hover:bg-stone-800 text-stone-700 dark:text-stone-200 text-xs font-semibold shadow-xs transition-colors"
+          >
+            <Activity className="size-3.5 text-emerald-600" />
+            <span>{t?.nav?.reviewerActivity || 'Reviewer Activity'}</span>
+          </Link>
           <Button
             onClick={() => setIsAddOpen(true)}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white shadow"
+            className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs rounded-xl text-xs font-semibold"
           >
-            <UserPlus className="mr-2 h-4 w-4" />
+            <UserPlus className="mr-1.5 h-3.5 w-3.5" />
             {t?.committee?.addMember || 'Add Committee Member'}
           </Button>
         </div>

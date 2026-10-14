@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import { getServerTranslations } from '@/lib/i18n/server';
 import { getCurrentUser } from '@/lib/auth/session';
 import { getApplicationDeadlineStatus } from '@/lib/application/deadline';
@@ -46,9 +47,21 @@ export default async function HomePage() {
       {/* Hero Section */}
       <section className="relative overflow-hidden pt-12 pb-16 sm:pt-20 sm:pb-24 px-4 sm:px-6 lg:px-8 border-b border-stone-200/80 dark:border-stone-800/80 bg-gradient-to-b from-stone-50 via-stone-100/60 to-white dark:from-stone-950 dark:via-stone-900/60 dark:to-stone-950">
         <div className="max-w-5xl mx-auto text-center space-y-6">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-100/80 dark:bg-emerald-950/70 border border-emerald-300 dark:border-emerald-800 text-emerald-900 dark:text-emerald-300 text-xs font-semibold shadow-xs">
-            <Sparkles className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-            <span>{deadlineStatus.cycleLabel}</span>
+          <div className="flex flex-col items-center justify-center gap-3">
+            <div className="p-2.5 rounded-2xl bg-white dark:bg-stone-900 border border-stone-200/90 dark:border-stone-800 shadow-md">
+              <Image
+                src="/saathi-logo.png"
+                alt="Saathi Teachers Programme Logo"
+                width={180}
+                height={60}
+                className="h-12 sm:h-14 w-auto object-contain dark:brightness-110"
+                priority
+              />
+            </div>
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-100/80 dark:bg-emerald-950/70 border border-emerald-300 dark:border-emerald-800 text-emerald-900 dark:text-emerald-300 text-xs font-semibold shadow-xs">
+              <Sparkles className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+              <span>{deadlineStatus.cycleLabel}</span>
+            </div>
           </div>
 
           <h1 className="text-3xl sm:text-5xl lg:text-6xl font-heading font-extrabold text-stone-900 dark:text-stone-50 tracking-tight leading-tight">

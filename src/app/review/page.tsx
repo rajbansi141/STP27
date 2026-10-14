@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation';
+import Link from 'next/link';
 import { requireRole } from '@/lib/auth/rbac';
 import { getServerTranslations } from '@/lib/i18n/server';
 import prisma from '@/lib/prisma';
@@ -11,12 +12,24 @@ import {
   TrendingUp,
   FileSpreadsheet,
   ShieldCheck,
+  Workflow,
+  Lock,
+  UserCheck,
 } from 'lucide-react';
 
-export default async function ReviewerPortalPage() {
+interface ReviewerPortalPageProps {
+  searchParams?: Promise<{
+    stage?: string;
+  }>;
+}
+
+export default async function ReviewerPortalPage({ searchParams }: ReviewerPortalPageProps) {
   // Enforce server-side RBAC: Only REVIEWER or ADMIN
   const currentUser = await requireRole(['REVIEWER', 'ADMIN'], '/review');
   const { t, locale } = await getServerTranslations();
+
+  const params = searchParams ? await searchParams : undefined;
+  const initialStage = params?.stage || 'ALL';
 
   // Load configured stages
   const stages = await prisma.stage.findMany({
@@ -29,48 +42,63 @@ export default async function ReviewerPortalPage() {
     name: locale === 'ne' ? s.nameNe : s.nameEn,
   }));
 
-  // Fetch applications
-  // If ADMIN, sees all submitted applications; if REVIEWER, sees assigned or all submitted in recruitment pool
-  const applications = await prisma.application.findMany({
+  // Fetch ALL candidate applications across stages (so reviewers can see cohort directory)
+  const allApplications = await prisma.application.findMany({
     where: {
-      status: 'SUBMITTED',
-      ...(currentUser.role === 'REVIEWER'
-        ? {
-            OR: [
-              { assignments: { some: { reviewerId: currentUser.id } } },
-              { assignments: { none: {} } }, // also show pool for review
-            ],
-          }
-        : {}),
+      status: { not: 'DRAFT' },
     },
     include: {
       applicant: true,
       reviews: true,
-      assignments: true,
+      assignments: {
+        include: { reviewer: true },
+      },
     },
     orderBy: { submittedAt: 'desc' },
   });
 
-  // Calculate reviewer KPIs
-  const totalAssigned = applications.length;
+  // Calculate Stage Counts for the pipeline stepper
+  const stageCounts: Record<string, number> = {};
+  allApplications.forEach((app) => {
+    stageCounts[app.stage] = (stageCounts[app.stage] || 0) + 1;
+  });
+
+  // Reviewer-specific KPIs
+  const myAssignedApplications = allApplications.filter((app) =>
+    app.assignments.some((a) => a.reviewerId === currentUser.id)
+  );
+
+  const totalAssigned = myAssignedApplications.length;
   let completedCount = 0;
   let totalScoreSum = 0;
   let advancedCount = 0;
 
-  const tableData: ApplicationRowItem[] = applications.map((app) => {
+  myAssignedApplications.forEach((app) => {
+    const myReview = app.reviews.find((r) => r.reviewerId === currentUser.id);
+    if (myReview) {
+      completedCount++;
+      if (myReview.totalScore) totalScoreSum += myReview.totalScore;
+      if (myReview.recommendation === 'ADVANCE') advancedCount++;
+    }
+  });
+
+  const pendingCount = totalAssigned - completedCount;
+  const avgScore = completedCount > 0 ? (totalScoreSum / completedCount).toFixed(1) : '—';
+  const advanceRate = completedCount > 0 ? `${Math.round((advancedCount / completedCount) * 100)}%` : '—';
+
+  // Format table data for TanStack Table
+  const tableData: ApplicationRowItem[] = allApplications.map((app) => {
     const parsedData = app.data
       ? typeof app.data === 'string'
         ? JSON.parse(app.data)
         : app.data
       : {};
 
-    const myReview = app.reviews.find((r) => r.reviewerId === currentUser.id);
+    const isAssignedToMe =
+      currentUser.role === 'ADMIN' ||
+      app.assignments.some((a) => a.reviewerId === currentUser.id);
 
-    if (myReview) {
-      completedCount++;
-      if (myReview.totalScore) totalScoreSum += myReview.totalScore;
-      if (myReview.recommendation === 'ADVANCE') advancedCount++;
-    }
+    const myReview = app.reviews.find((r) => r.reviewerId === currentUser.id);
 
     return {
       id: app.id,
@@ -81,16 +109,18 @@ export default async function ReviewerPortalPage() {
       degree: `${parsedData.highestLevel || "Bachelor's"} (${parsedData.fieldOfStudy || 'Education'})`,
       subject: parsedData.teachingSubject || 'General',
       stage: app.stage,
+      status: app.status,
       submittedAt: app.submittedAt ? new Date(app.submittedAt).toLocaleDateString() : null,
+      isAssignedToMe,
+      assignedReviewers: app.assignments.map((a) => ({
+        id: a.reviewer.id,
+        name: a.reviewer.name,
+      })),
       reviewedByCurrentReviewer: Boolean(myReview),
       myScore: myReview?.totalScore || null,
       myRecommendation: myReview?.recommendation || null,
     };
   });
-
-  const pendingCount = totalAssigned - completedCount;
-  const avgScore = completedCount > 0 ? (totalScoreSum / completedCount).toFixed(1) : '—';
-  const advanceRate = completedCount > 0 ? `${Math.round((advancedCount / completedCount) * 100)}%` : '—';
 
   return (
     <div className="flex-1 py-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full space-y-6">
@@ -110,14 +140,18 @@ export default async function ReviewerPortalPage() {
         </div>
 
         <div className="text-xs text-right hidden sm:block">
-          <span className="text-emerald-200">{currentUser.name}</span>
+          <span className="text-emerald-200 font-semibold">{currentUser.name}</span>
           <div className="text-[11px] text-emerald-300 font-mono mt-0.5">
             {currentUser.email}
+          </div>
+          <div className="mt-2 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white/10 text-emerald-100 text-[11px]">
+            <UserCheck className="h-3 w-3" />
+            <span>{totalAssigned} assigned to you</span>
           </div>
         </div>
       </div>
 
-      {/* KPI Cards (Tremor-inspired metric cards) */}
+      {/* Reviewer Personal Workload KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3.5">
         <div className="p-4 rounded-2xl bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 shadow-sm space-y-1">
           <div className="flex items-center justify-between text-stone-500 text-xs">
@@ -170,8 +204,79 @@ export default async function ReviewerPortalPage() {
         </div>
       </div>
 
-      {/* TanStack Table Section */}
-      <ReviewTable data={tableData} availableStages={availableStages} />
+      {/* Stage Progression Pipeline Control for Reviewer */}
+      <div className="rounded-2xl border border-stone-200/90 dark:border-stone-800 bg-white dark:bg-stone-900/90 p-3 shadow-xs">
+        <div className="flex items-center justify-between mb-2 px-1">
+          <div className="flex items-center gap-2">
+            <Workflow className="h-3.5 w-3.5 text-emerald-600" />
+            <span className="text-[11px] font-bold uppercase tracking-wider text-stone-600 dark:text-stone-300">
+              {locale === 'ne' ? 'छनोट पाइपलाइन चरणहरू' : 'Selection Pipeline Progression'}
+            </span>
+          </div>
+          <span className="text-xs text-stone-500">
+            {locale === 'ne'
+              ? `कुल ${allApplications.length} उम्मेदवार`
+              : `${allApplications.length} Total Candidates`}
+          </span>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href="/review"
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+              initialStage === 'ALL'
+                ? 'bg-emerald-600 text-white shadow-xs'
+                : 'bg-stone-100 hover:bg-stone-200 text-stone-700 dark:bg-stone-800 dark:hover:bg-stone-700 dark:text-stone-300'
+            }`}
+          >
+            <span>{locale === 'ne' ? 'सबै चरणहरू' : 'All Stages'}</span>
+            <span
+              className={`rounded-full px-1.5 py-0.2 text-[10px] font-mono ${
+                initialStage === 'ALL'
+                  ? 'bg-white/20 text-white'
+                  : 'bg-stone-200 text-stone-700 dark:bg-stone-700 dark:text-stone-300'
+              }`}
+            >
+              {allApplications.length}
+            </span>
+          </Link>
+
+          {availableStages.map((stg) => {
+            const isCurrent = initialStage === stg.code;
+            const count = stageCounts[stg.code] || 0;
+            return (
+              <Link
+                key={stg.code}
+                href={`/review?stage=${stg.code}`}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                  isCurrent
+                    ? 'bg-emerald-600 text-white shadow-xs ring-2 ring-emerald-600/30'
+                    : 'bg-stone-100 hover:bg-stone-200 text-stone-700 dark:bg-stone-800 dark:hover:bg-stone-700 dark:text-stone-300'
+                }`}
+              >
+                <span>{stg.name}</span>
+                <span
+                  className={`rounded-full px-1.5 py-0.2 text-[10px] font-mono ${
+                    isCurrent
+                      ? 'bg-white/20 text-white'
+                      : 'bg-stone-200 text-stone-700 dark:bg-stone-700 dark:text-stone-300'
+                  }`}
+                >
+                  {count}
+                </span>
+              </Link>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* TanStack Table Section with Assignment Locks */}
+      <ReviewTable
+        data={tableData}
+        availableStages={availableStages}
+        initialStage={initialStage}
+        currentReviewerId={currentUser.id}
+      />
     </div>
   );
 }

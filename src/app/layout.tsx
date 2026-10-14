@@ -25,6 +25,18 @@ export const metadata: Metadata = {
   title: 'Saathi Teachers Programme (STP) 2027 | साथी शिक्षक कार्यक्रम २०२७',
   description:
     'Teacher Recruitment and Selection Management Portal for Saathi Teachers Programme Cohort 2027.',
+  icons: {
+    icon: [
+      { url: '/saathi-logo.png', type: 'image/png' },
+      { url: '/icon.png', type: 'image/png' },
+      { url: '/favicon.ico' },
+    ],
+    shortcut: '/saathi-logo.png',
+    apple: [
+      { url: '/apple-icon.png', sizes: '180x180', type: 'image/png' },
+      { url: '/saathi-logo.png' },
+    ],
+  },
 };
 
 export default async function RootLayout({

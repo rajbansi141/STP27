@@ -1,5 +1,7 @@
 'use client';
 
+import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { useI18n } from '@/lib/i18n';
 import { Heart } from 'lucide-react';
@@ -22,10 +24,19 @@ export function Footer() {
   return (
     <footer className="border-t border-stone-200 dark:border-stone-800 bg-stone-100/50 dark:bg-stone-900/40 text-stone-600 dark:text-stone-400 py-8 px-4 sm:px-6 lg:px-8 mt-auto">
       <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4 text-xs">
-        <div className="flex flex-col sm:flex-row items-center gap-2 text-center sm:text-left">
-          <span className="font-semibold text-stone-800 dark:text-stone-200">
-            {t?.common?.appName || 'Saathi Teachers Programme 2027'}
-          </span>
+        <div className="flex flex-col sm:flex-row items-center gap-2.5 text-center sm:text-left">
+          <div className="flex items-center gap-2">
+            <Image
+              src="/saathi-logo.png"
+              alt="Saathi Teachers Programme Logo"
+              width={70}
+              height={24}
+              className="h-5 w-auto object-contain dark:brightness-110"
+            />
+            <span className="font-semibold text-stone-800 dark:text-stone-200">
+              {t?.common?.appName || 'Saathi Teachers Programme 2027'}
+            </span>
+          </div>
           <span className="hidden sm:inline">•</span>
           <span>
             {locale === 'ne'
