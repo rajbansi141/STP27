@@ -36,7 +36,6 @@ interface QueueEmailOptions {
 export async function queueEmail({
   to,
   subject,
-  html,
   templateCode,
 }: QueueEmailOptions) {
   let templateId: string | undefined;
@@ -90,9 +89,6 @@ export async function processEmailOutbox(): Promise<{
           html: log.template?.body || `<p>${log.subject}</p>`,
           text: (log.template?.body || log.subject || '').replace(/<[^>]*>/g, ''),
         });
-      } else {
-        // Local simulation log
-        console.log(`[OUTBOX WORKER] Delivered email to: ${log.to} | Subject: ${log.subject}`);
       }
       succeeded++;
     } catch (err: unknown) {

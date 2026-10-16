@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import Link from 'next/link';
 import {
   MoreHorizontal,
   Search,
@@ -247,10 +248,13 @@ export function CommitteeTable({ initialMembers }: CommitteeTableProps) {
                             {(member.username || member.name).slice(0, 2).toUpperCase()}
                           </div>
                           <div>
-                            <div className="font-semibold text-xs text-foreground font-mono">
+                            <Link
+                              href={`/admin/committee/${member.id}`}
+                              className="font-semibold text-xs text-foreground font-mono hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
+                            >
                               {member.username || member.name}
-                            </div>
-                            <span className="text-[10px] text-muted-foreground">
+                            </Link>
+                            <span className="text-[10px] text-muted-foreground block">
                               Role: REVIEWER
                             </span>
                           </div>
@@ -327,6 +331,20 @@ export function CommitteeTable({ initialMembers }: CommitteeTableProps) {
                               {locale === 'ne' ? 'कार्यहरू' : 'Reviewer Actions'}
                             </DropdownMenuLabel>
                             <DropdownMenuSeparator />
+
+                            {/* View Profile & Performance */}
+                            <DropdownMenuItem
+                              render={
+                                <Link
+                                  href={`/admin/committee/${member.id}`}
+                                  className="flex items-center w-full"
+                                />
+                              }
+                              className="cursor-pointer"
+                            >
+                              <User className="mr-2 h-3.5 w-3.5 text-emerald-600" />
+                              <span>{locale === 'ne' ? 'विवरण र कार्यसम्पादन' : 'View Profile & Performance'}</span>
+                            </DropdownMenuItem>
 
                             {/* Edit Phone / Email */}
                             <DropdownMenuItem

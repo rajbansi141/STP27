@@ -23,6 +23,7 @@ import {
   Clock,
   Terminal,
 } from 'lucide-react';
+import { buildSanitizedCsv, downloadCsv } from '@/lib/csv';
 
 export interface AuditLogRow {
   id: string;
@@ -76,7 +77,7 @@ export function AdminAuditTable({ logs }: AdminAuditTableProps) {
     });
   }, [logs, actionFilter, globalFilter]);
 
-  // Export CSV
+  // Export CSV (Sanitized against CWE-1236 Formula Injection)
   const handleExportCsv = () => {
     const headers = [
       'Timestamp',
@@ -91,28 +92,19 @@ export function AdminAuditTable({ logs }: AdminAuditTableProps) {
     ];
 
     const rows = filteredData.map((l) => [
-      `"${new Date(l.at).toISOString()}"`,
-      `"${l.actorName.replace(/"/g, '""')}"`,
-      `"${l.actorEmail || 'N/A'}"`,
-      `"${l.role || 'GUEST'}"`,
-      `"${l.action}"`,
-      `"${l.entity}"`,
-      `"${l.entityId || 'N/A'}"`,
-      `"${l.ip || 'N/A'}"`,
-      `"${JSON.stringify(l.meta || {}).replace(/"/g, '""')}"`,
+      new Date(l.at).toISOString(),
+      l.actorName,
+      l.actorEmail || 'N/A',
+      l.role || 'GUEST',
+      l.action,
+      l.entity,
+      l.entityId || 'N/A',
+      l.ip || 'N/A',
+      JSON.stringify(l.meta || {}),
     ]);
 
-    const csvContent =
-      'data:text/csv;charset=utf-8,\uFEFF' +
-      [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
-
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', 'stp-2027-audit-trail.csv');
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const csv = buildSanitizedCsv(headers, rows);
+    downloadCsv('stp-2027-audit-trail.csv', csv);
   };
 
   const columns = useMemo<ColumnDef<AuditLogRow>[]>(

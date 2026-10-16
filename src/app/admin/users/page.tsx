@@ -13,6 +13,15 @@ export default async function AdminUsersPage() {
 
   const users = await prisma.user.findMany({
     orderBy: { createdAt: 'desc' },
+    include: {
+      _count: {
+        select: {
+          applications: true,
+          reviews: true,
+          reviewerAssignments: true,
+        },
+      },
+    },
   });
 
   const userRows: AdminUserRow[] = users.map((u) => ({
@@ -23,7 +32,14 @@ export default async function AdminUsersPage() {
     role: u.role as 'ADMIN' | 'REVIEWER' | 'APPLICANT',
     isActive: u.isActive,
     mustChangePassword: u.mustChangePassword,
+    failedLoginAttempts: u.failedLoginAttempts,
+    lockedUntil: u.lockedUntil ? u.lockedUntil.toISOString() : null,
+    emailVerified: u.emailVerified ? u.emailVerified.toISOString() : null,
     createdAt: u.createdAt.toISOString(),
+    updatedAt: u.updatedAt.toISOString(),
+    applicationsCount: u._count.applications,
+    reviewsCount: u._count.reviews,
+    assignmentsCount: u._count.reviewerAssignments,
   }));
 
   return (

@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers';
 import crypto from 'node:crypto';
 import prisma from '@/lib/prisma';
-import type { User, Role } from '@prisma/client';
+import type { Role } from '@prisma/client';
 
 export const SESSION_COOKIE_NAME = 'stp_session';
 export const SESSION_MAX_AGE_SECONDS = 30 * 24 * 60 * 60; // 30 days

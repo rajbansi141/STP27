@@ -40,8 +40,8 @@ export function Footer() {
           <span className="hidden sm:inline">•</span>
           <span>
             {locale === 'ne'
-              ? 'नेपालका दुर्गम विद्यालयहरूमा शैक्षिक गुणस्तर अभिवृद्धिका लागि समर्पित शिक्षक फेलोसिप।'
-              : 'Dedicated teaching fellowship fostering quality education in rural community schools of Nepal.'}
+              ? 'नेपालका दुर्गम विद्यालयहरूमा शैक्षिक गुणस्तर अभिवृद्धिका लागि समर्पित साथी शिक्षक फेलोसिप।'
+              : 'Dedicated Saathi Teacher fellowship fostering quality education in rural community schools of Nepal.'}
           </span>
         </div>
 

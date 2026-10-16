@@ -1,7 +1,7 @@
 {
   "common": {
     "appName": "Saathi Teachers Programme 2027",
-    "subTitle": "Transforming Education Through Committed Teachers in Rural Nepal",
+    "subTitle": "Transforming Education Through Committed Saathi Teachers in Rural Nepal",
     "cohort": "STP 2027 Cohort",
     "loading": "Loading...",
     "submit": "Submit Application",
@@ -43,6 +43,7 @@
     "formBuilder": "Application Form Builder",
     "pipeline": "Stages & Pipeline",
     "applicants": "Applicants",
+    "ascHub": "Assessment Center (ASC)",
     "people": "People",
     "committee": "Selection Committee (SCM)",
     "reviewerActivity": "Reviewer Activity",
@@ -66,7 +67,7 @@
     "vacancy": "Vacancy",
     "process": "Selection Process",
     "help": "Help & FAQs",
-    "applyNow": "Apply Now"
+    "applyNow": "Become A Saathi Teacher"
   },
   "committee": {
     "title": "Selection Committee (SCM)",

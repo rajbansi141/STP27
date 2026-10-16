@@ -31,10 +31,20 @@ export function PublicNavbar() {
 
   const navLinks = [
     { href: '/', label: t?.nav?.home || 'Home' },
-    { href: '/vacancy', label: t?.nav?.vacancy || 'Vacancy' },
     { href: '/process', label: t?.nav?.process || 'Process' },
     { href: '/help', label: t?.nav?.help || 'Help' },
   ];
+
+  // Hide on all console/dashboard routes
+  if (
+    pathname.startsWith('/admin') ||
+    pathname.startsWith('/reviewer') ||
+    pathname.startsWith('/applicant') ||
+    pathname.startsWith('/dashboard') ||
+    pathname.startsWith('/review')
+  ) {
+    return null;
+  }
 
   return (
     <header
@@ -130,7 +140,7 @@ export function PublicNavbar() {
               className: 'bg-emerald-600 font-semibold text-white shadow-xs hover:bg-emerald-700',
             })}
           >
-            {t?.nav?.applyNow || 'Apply Now'}
+            {t?.nav?.applyNow || 'Become A Saathi Teacher'}
             <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
           </Link>
         </div>
@@ -206,7 +216,7 @@ export function PublicNavbar() {
                       className: 'w-full justify-center bg-emerald-600 hover:bg-emerald-700 text-white',
                     })}
                   >
-                    {t?.nav?.applyNow || 'Apply Now'}
+                    {t?.nav?.applyNow || 'Become A Saathi Teacher'}
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Link>
                 </div>

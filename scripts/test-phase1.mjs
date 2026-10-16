@@ -50,7 +50,7 @@ async function runPhase1Tests() {
   console.log(`✔ [4/7] Admin user found: role = ${userAdmin.role}, mustChangePassword = ${userAdmin.mustChangePassword}`);
 
   // 5. Reviewer User & Mandatory Password Change Flag
-  const userReviewer = await prisma.user.findFirst({ where: { role: 'REVIEWER' } });
+  const userReviewer = await prisma.user.findFirst({ where: { role: 'REVIEWER', mustChangePassword: true } });
   if (!userReviewer || !userReviewer.mustChangePassword) {
     throw new Error('Reviewer user with mustChangePassword=true not found!');
   }

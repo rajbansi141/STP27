@@ -24,7 +24,7 @@ export default async function CommitteeManagementPage() {
     }),
     prisma.review.count(),
     prisma.application.count({
-      where: { status: 'SUBMITTED' },
+      where: { status: { not: 'DRAFT' } },
     }),
   ]);
 

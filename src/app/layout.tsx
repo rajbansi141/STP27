@@ -1,9 +1,9 @@
 import type { Metadata } from 'next';
-import { Plus_Jakarta_Sans, Inter, Noto_Sans_Devanagari, Geist } from 'next/font/google';
+import { Plus_Jakarta_Sans, Inter, Noto_Sans_Devanagari } from 'next/font/google';
 import './globals.css';
 import { getServerLocale } from '@/lib/i18n/server';
 import { I18nProvider } from '@/lib/i18n/context';
-import { Navbar } from '@/components/layout/Navbar';
+import { PublicNavbar } from '@/components/layout/public-navbar';
 import { Footer } from '@/components/layout/Footer';
 import { cn } from "@/lib/utils";
 
@@ -13,7 +13,11 @@ const plusJakartaSans = Plus_Jakarta_Sans({
   display: 'swap',
 });
 
-const geist = Geist({subsets:['latin'],variable:'--font-sans'});
+const inter = Inter({
+  subsets: ['latin'],
+  variable: '--font-sans',
+  display: 'swap',
+});
 
 const notoSansDevanagari = Noto_Sans_Devanagari({
   subsets: ['devanagari'],
@@ -24,7 +28,7 @@ const notoSansDevanagari = Noto_Sans_Devanagari({
 export const metadata: Metadata = {
   title: 'Saathi Teachers Programme (STP) 2027 | साथी शिक्षक कार्यक्रम २०२७',
   description:
-    'Teacher Recruitment and Selection Management Portal for Saathi Teachers Programme Cohort 2027.',
+    'Saathi Teacher Recruitment and Selection Management Portal for Saathi Teachers Programme Cohort 2027.',
   icons: {
     icon: [
       { url: '/saathi-logo.png', type: 'image/png' },
@@ -49,7 +53,7 @@ export default async function RootLayout({
   return (
     <html
       lang={locale}
-      className={cn("h-full", "antialiased", plusJakartaSans.variable, notoSansDevanagari.variable, "font-sans", geist.variable)}
+      className={cn("h-full", "antialiased", plusJakartaSans.variable, notoSansDevanagari.variable, inter.variable, "font-sans")}
       suppressHydrationWarning
     >
       <body
@@ -57,7 +61,7 @@ export default async function RootLayout({
         className="min-h-full flex flex-col bg-background text-foreground transition-colors duration-200"
       >
         <I18nProvider initialLocale={locale}>
-          <Navbar />
+          <PublicNavbar />
           <main className="flex-1 flex flex-col">{children}</main>
           <Footer />
         </I18nProvider>

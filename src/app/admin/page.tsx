@@ -17,6 +17,7 @@ import {
   BookOpen,
   Mail,
   Settings,
+  CalendarRange,
 } from 'lucide-react';
 
 export default async function AdminOverviewPage() {
@@ -37,7 +38,7 @@ export default async function AdminOverviewPage() {
   ] = await Promise.all([
     prisma.user.count({ where: { role: 'APPLICANT' } }),
     prisma.application.count(),
-    prisma.application.count({ where: { status: 'SUBMITTED' } }),
+    prisma.application.count({ where: { status: { not: 'DRAFT' } } }),
     prisma.application.count({ where: { status: 'DRAFT' } }),
     prisma.user.count({ where: { role: 'REVIEWER', isActive: true } }),
     prisma.review.findMany({
@@ -49,7 +50,7 @@ export default async function AdminOverviewPage() {
       orderBy: { order: 'asc' },
     }),
     prisma.application.findMany({
-      where: { status: 'SUBMITTED' },
+      where: { status: { not: 'DRAFT' } },
       select: { stage: true, data: true },
     }),
     prisma.auditLog.findMany({
@@ -91,9 +92,15 @@ export default async function AdminOverviewPage() {
     }
   }
 
+  // Normalize stage code aliases (e.g. PHONE_SCREENING -> PHONE_INTERVIEW)
+  const normalizeStageCode = (code: string) => {
+    if (code === 'PHONE_SCREENING') return 'PHONE_INTERVIEW';
+    return code;
+  };
+
   // Calculate stage breakdown
   const stageDistribution = stages.map((s) => {
-    const count = allApplications.filter((a) => a.stage === s.code).length;
+    const count = allApplications.filter((a) => normalizeStageCode(a.stage) === s.code).length;
     const percentage = submittedApps > 0 ? Math.round((count / submittedApps) * 100) : 0;
     return {
       code: s.code,
@@ -103,7 +110,7 @@ export default async function AdminOverviewPage() {
     };
   });
 
-  // Calculate subject breakdown
+  // Calculate subject breakdown with robust case and format normalization
   const subjectCounts: Record<string, number> = {
     English: 0,
     Math: 0,
@@ -117,11 +124,46 @@ export default async function AdminOverviewPage() {
         ? JSON.parse(app.data)
         : app.data
       : {};
-    const sub = parsedData.teachingSubject;
-    if (sub === 'English') subjectCounts.English++;
-    else if (sub === 'Math') subjectCounts.Math++;
-    else if (sub === 'Grade Teaching') subjectCounts['Grade Teaching']++;
-    else subjectCounts.Other++;
+    const rawSub = (parsedData.teachingSubject || '').trim().toLowerCase();
+    if (rawSub === 'english') {
+      subjectCounts.English++;
+    } else if (rawSub === 'math' || rawSub === 'mathematics') {
+      subjectCounts.Math++;
+    } else if (rawSub === 'grade_teaching' || rawSub === 'grade teaching' || rawSub === 'grade') {
+      subjectCounts['Grade Teaching']++;
+    } else if (rawSub) {
+      subjectCounts.Other++;
+    }
+  }
+
+  const subjectItems = [
+    {
+      key: 'English',
+      label: locale === 'ne' ? 'अंग्रेजी (English)' : 'English',
+      count: subjectCounts.English,
+      color: 'bg-blue-500',
+    },
+    {
+      key: 'Math',
+      label: locale === 'ne' ? 'गणित (Math)' : 'Math',
+      count: subjectCounts.Math,
+      color: 'bg-emerald-500',
+    },
+    {
+      key: 'Grade Teaching',
+      label: locale === 'ne' ? 'कक्षा शिक्षण (Grade Teaching)' : 'Grade Teaching',
+      count: subjectCounts['Grade Teaching'],
+      color: 'bg-amber-500',
+    },
+  ];
+
+  if (subjectCounts.Other > 0) {
+    subjectItems.push({
+      key: 'Other',
+      label: locale === 'ne' ? 'अन्य विषयहरू (Other)' : 'Other Subjects',
+      count: subjectCounts.Other,
+      color: 'bg-purple-500',
+    });
   }
 
   return (
@@ -147,6 +189,20 @@ export default async function AdminOverviewPage() {
           >
             <Users className="size-3.5" />
             <span>{t.admin.nav.candidates}</span>
+          </Link>
+          <Link
+            href="/admin/asc"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 hover:bg-stone-50 dark:hover:bg-stone-800 text-stone-700 dark:text-stone-200 text-xs font-semibold shadow-xs transition-colors"
+          >
+            <Award className="size-3.5 text-emerald-600" />
+            <span>{t.nav.ascHub || 'Assessment Center (ASC)'}</span>
+          </Link>
+          <Link
+            href="/admin/cohorts"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 hover:bg-stone-50 dark:hover:bg-stone-800 text-stone-700 dark:text-stone-200 text-xs font-semibold shadow-xs transition-colors"
+          >
+            <CalendarRange className="size-3.5 text-indigo-600" />
+            <span>{t.nav.cohorts || 'Cohorts'}</span>
           </Link>
           <Link
             href="/admin/committee"
@@ -297,38 +353,53 @@ export default async function AdminOverviewPage() {
 
         {/* Right Column: Teaching Subject Breakdown (5 Cols) */}
         <div className="lg:col-span-5 bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-2xl p-6 shadow-sm space-y-5">
-          <div>
-            <h2 className="text-base font-bold font-heading text-stone-900 dark:text-stone-50 flex items-center gap-2">
-              <BookOpen className="h-4 w-4 text-emerald-600" />
-              <span>{t.admin.charts.subjectDistTitle}</span>
-            </h2>
-            <p className="text-xs text-stone-500 mt-0.5">
-              {t.admin.charts.subjectDistDesc}
-            </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-base font-bold font-heading text-stone-900 dark:text-stone-50 flex items-center gap-2">
+                <BookOpen className="h-4 w-4 text-emerald-600" />
+                <span>{t.admin.charts.subjectDistTitle}</span>
+              </h2>
+              <p className="text-xs text-stone-500 mt-0.5">
+                {t.admin.charts.subjectDistDesc}
+              </p>
+            </div>
+            <Link
+              href="/admin/candidates"
+              className="text-xs font-semibold text-emerald-700 hover:text-emerald-800 dark:text-emerald-400 flex items-center gap-1"
+            >
+              <span>{locale === 'ne' ? 'सबै उम्मेदवार' : 'All Candidates'}</span>
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
           </div>
 
-          <div className="space-y-4 pt-2">
-            {[
-              { label: 'English', count: subjectCounts.English, color: 'bg-blue-500' },
-              { label: 'Math', count: subjectCounts.Math, color: 'bg-emerald-500' },
-              { label: 'Grade Teaching', count: subjectCounts['Grade Teaching'], color: 'bg-amber-500' },
-            ].map((sub) => {
+          <div className="space-y-2 pt-1">
+            {subjectItems.map((sub) => {
               const pct = submittedApps > 0 ? Math.round((sub.count / submittedApps) * 100) : 0;
               return (
-                <div key={sub.label} className="p-3.5 rounded-xl bg-stone-50 dark:bg-stone-800/40 border border-stone-200/60 dark:border-stone-700/60 space-y-2">
+                <Link
+                  key={sub.key}
+                  href={`/admin/candidates?subject=${encodeURIComponent(sub.key)}`}
+                  className="group block space-y-1.5 p-2 rounded-xl transition-colors hover:bg-stone-50 dark:hover:bg-stone-800/60"
+                >
                   <div className="flex items-center justify-between text-xs font-semibold">
-                    <span className="text-stone-900 dark:text-stone-100">{sub.label}</span>
-                    <span className="font-mono font-bold text-emerald-800 dark:text-emerald-300">
-                      {locale === 'ne' ? toNepaliDigits(sub.count) : sub.count} ({pct}%)
+                    <span className="text-stone-800 dark:text-stone-200 group-hover:text-emerald-700 dark:group-hover:text-emerald-400 transition-colors">
+                      {sub.label}
                     </span>
+                    <div className="flex items-center gap-2 text-stone-500">
+                      <span className="font-mono font-bold text-stone-900 dark:text-stone-100">
+                        {locale === 'ne' ? toNepaliDigits(sub.count) : sub.count}
+                      </span>
+                      <span className="text-[11px] text-stone-400">({pct}%)</span>
+                      <ArrowRight className="size-3 opacity-0 group-hover:opacity-100 text-emerald-600 transition-opacity" />
+                    </div>
                   </div>
-                  <div className="w-full h-2 rounded-full bg-stone-200/70 dark:bg-stone-700 overflow-hidden">
+                  <div className="w-full h-2.5 rounded-full bg-stone-100 dark:bg-stone-800 overflow-hidden">
                     <div
-                      className={`h-full rounded-full ${sub.color} transition-all duration-500`}
+                      className={`h-full rounded-full ${sub.color} transition-all duration-500 group-hover:brightness-105`}
                       style={{ width: `${Math.max(pct, 2)}%` }}
                     />
                   </div>
-                </div>
+                </Link>
               );
             })}
           </div>

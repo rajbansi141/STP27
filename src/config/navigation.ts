@@ -1,28 +1,16 @@
 import {
   LayoutDashboard,
-  Briefcase,
-  FileSpreadsheet,
-  Workflow,
   Users,
+  Award,
+  CalendarRange,
   UserCheck,
   Activity,
   Mail,
-  Send,
-  Bell,
-  Download,
   ShieldAlert,
   Settings,
-  FileText,
-  Clock,
-  FolderOpen,
-  User,
   CheckCircle2,
-  ListTodo,
-  Layers,
-  PhoneCall,
-  Award,
-  School,
-  MapPin,
+  FileText,
+  User,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -61,36 +49,14 @@ export const navigationConfig: Record<'admin' | 'reviewer' | 'applicant', NavGro
           icon: Users,
         },
         {
-          titleKey: 'nav.stageProgression',
-          href: '/admin/candidates',
-          icon: Layers,
-          badge: 'Pipeline',
-          items: [
-            {
-              titleKey: 'nav.stageApplication',
-              href: '/admin/candidates?stage=APPLICATION',
-            },
-            {
-              titleKey: 'nav.stagePhone',
-              href: '/admin/candidates?stage=PHONE_INTERVIEW',
-            },
-            {
-              titleKey: 'nav.stageAsc',
-              href: '/admin/candidates?stage=ASC',
-            },
-            {
-              titleKey: 'nav.stageParents',
-              href: '/admin/candidates?stage=PARENTS_MEET',
-            },
-            {
-              titleKey: 'nav.stageSaathiSchool',
-              href: '/admin/candidates?stage=SAATHI_SCHOOL',
-            },
-            {
-              titleKey: 'nav.stagePlacement',
-              href: '/admin/candidates?stage=PLACEMENT',
-            },
-          ],
+          titleKey: 'nav.ascHub',
+          href: '/admin/asc',
+          icon: Award,
+        },
+        {
+          titleKey: 'nav.cohorts',
+          href: '/admin/cohorts',
+          icon: CalendarRange,
         },
       ],
     },
@@ -151,40 +117,8 @@ export const navigationConfig: Record<'admin' | 'reviewer' | 'applicant', NavGro
         },
         {
           titleKey: 'nav.evaluations',
-          href: '/review',
+          href: '/reviewer?filter=completed',
           icon: CheckCircle2,
-        },
-        {
-          titleKey: 'nav.stageProgression',
-          href: '/review',
-          icon: Workflow,
-          badge: 'Pipeline',
-          items: [
-            {
-              titleKey: 'nav.stageApplication',
-              href: '/review?stage=APPLICATION',
-            },
-            {
-              titleKey: 'nav.stagePhone',
-              href: '/review?stage=PHONE_INTERVIEW',
-            },
-            {
-              titleKey: 'nav.stageAsc',
-              href: '/review?stage=ASC',
-            },
-            {
-              titleKey: 'nav.stageParents',
-              href: '/review?stage=PARENTS_MEET',
-            },
-            {
-              titleKey: 'nav.stageSaathiSchool',
-              href: '/review?stage=SAATHI_SCHOOL',
-            },
-            {
-              titleKey: 'nav.stagePlacement',
-              href: '/review?stage=PLACEMENT',
-            },
-          ],
         },
       ],
     },
@@ -202,6 +136,11 @@ export const navigationConfig: Record<'admin' | 'reviewer' | 'applicant', NavGro
           titleKey: 'nav.myApplication',
           href: '/apply',
           icon: FileText,
+        },
+        {
+          titleKey: 'nav.profile',
+          href: '/profile',
+          icon: User,
         },
       ],
     },

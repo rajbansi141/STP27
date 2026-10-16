@@ -3,11 +3,9 @@
 import React, { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { useI18n } from '@/lib/i18n/context';
-import {
-  submitReviewAction,
-  adminDecisionAction,
-  adminUnlockReviewAction,
-} from '@/app/api/review/actions';
+import { submitReviewAction } from '@/app/api/review/actions';
+import { adminDecisionAction, adminUnlockReviewAction } from '@/app/api/admin/actions';
+import { ON_HOLD_CATEGORY_MAP, REJECTION_REASON_MAP } from '@/lib/constants/applicationReview';
 import {
   Award,
   CheckCircle2,
@@ -21,6 +19,7 @@ import {
   ArrowRight,
   ShieldCheck,
   FileCheck,
+  Clock,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -115,6 +114,8 @@ export function ScoringRubric({
   const [recommendation, setRecommendation] = useState<'ADVANCE' | 'HOLD' | 'REJECT'>(
     (existingReview?.recommendation as any) || 'ADVANCE'
   );
+  const [holdCategory, setHoldCategory] = useState<string>('GENERAL_HOLD');
+  const [rejectionCategory, setRejectionCategory] = useState<string>('SCORE_CUTOFF');
 
   // Status message
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(
@@ -155,6 +156,8 @@ export function ScoringRubric({
         leadershipScore,
         comment,
         recommendation,
+        holdCategory: recommendation === 'HOLD' ? holdCategory : undefined,
+        rejectionCategory: recommendation === 'REJECT' ? rejectionCategory : undefined,
         docChecks,
       });
 
@@ -525,6 +528,11 @@ export function ScoringRubric({
           placeholder={t.reviewer.scoring.commentsPlaceholder}
           className="w-full p-3 rounded-xl border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-900 text-xs text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-emerald-600 disabled:opacity-50"
         />
+        <p className="text-[11px] text-stone-500">
+          {locale === 'ne'
+            ? 'गुणात्मक टिप्पणी ऐच्छिक हो, तर समिति निर्णयका लागि उपयोगी मानिन्छ।'
+            : 'Qualitative notes are optional, but helpful for selection committee records.'}
+        </p>
       </div>
 
       {/* Recommendation Radio Options */}
@@ -590,6 +598,45 @@ export function ScoringRubric({
             <span>{t.reviewer.scoring.rejectOption}</span>
           </label>
         </div>
+
+        {/* Simple Hold Indicator */}
+        {recommendation === 'HOLD' && (
+          <div className="p-3 rounded-xl border border-amber-300 dark:border-amber-800 bg-amber-50/70 dark:bg-amber-950/40 text-amber-900 dark:text-amber-200 text-xs flex items-center gap-2.5 mt-2 transition-all">
+            <Clock className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
+            <p className="text-[11px] leading-tight">
+              {locale === 'ne'
+                ? 'आवेदन होल्डमा राखिनेछ। समीक्षक वा व्यवस्थापकसँग सोझै आगामी चरणमा लैजाने वा प्रक्रिया टुंग्याउने प्रत्यक्ष अधिकार हुनेछ।'
+                : 'Application will be placed on hold. The assigned reviewer or admin has direct authority to advance or reject at any time.'}
+            </p>
+          </div>
+        )}
+
+        {/* Structured Rejection Category Selector */}
+        {recommendation === 'REJECT' && (
+          <div className="p-3.5 rounded-xl border border-red-300 dark:border-red-800 bg-red-50/70 dark:bg-red-950/40 space-y-2 mt-2 transition-all">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400 shrink-0" />
+              <label className="text-xs font-bold text-red-950 dark:text-red-200">
+                {t.reviewer.scoring.rejectionCategoryLabel || 'Rejection Reason'}
+              </label>
+            </div>
+            <select
+              disabled={isLocked}
+              value={rejectionCategory}
+              onChange={(e) => setRejectionCategory(e.target.value)}
+              className="w-full p-2.5 rounded-lg text-xs font-medium border border-red-300 dark:border-red-700 bg-white dark:bg-stone-900 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-red-500 disabled:opacity-50"
+            >
+              {Object.entries(REJECTION_REASON_MAP).map(([key, item]) => (
+                <option key={key} value={key}>
+                  {locale === 'ne' ? item.ne : item.en}
+                </option>
+              ))}
+            </select>
+            <p className="text-[11px] text-red-800 dark:text-red-300 leading-tight">
+              {REJECTION_REASON_MAP[rejectionCategory]?.defaultNote}
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Reviewer Submit & Lock Action OR Dossier Review Mode Notice */}
@@ -610,9 +657,9 @@ export function ScoringRubric({
       ) : !isLocked ? (
         <button
           type="button"
-          disabled={isPending || !comment.trim()}
+          disabled={isPending}
           onClick={handleSubmitReview}
-          className="w-full py-3 px-4 rounded-xl font-bold text-xs text-white bg-emerald-700 hover:bg-emerald-800 dark:bg-emerald-600 dark:hover:bg-emerald-500 shadow-md transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+          className="w-full py-3 px-4 rounded-xl font-bold text-xs text-white bg-emerald-700 hover:bg-emerald-800 dark:bg-emerald-600 dark:hover:bg-emerald-500 shadow-md transition-all disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
         >
           {isPending ? (
             <>

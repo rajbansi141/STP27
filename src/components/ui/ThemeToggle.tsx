@@ -1,34 +1,43 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useSyncExternalStore, useCallback } from 'react';
 import { Sun, Moon } from 'lucide-react';
 
+function subscribe(callback: () => void) {
+  window.addEventListener('storage', callback);
+  const mql = window.matchMedia('(prefers-color-scheme: dark)');
+  mql.addEventListener('change', callback);
+  return () => {
+    window.removeEventListener('storage', callback);
+    mql.removeEventListener('change', callback);
+  };
+}
+
+function getSnapshot(): boolean {
+  if (typeof window === 'undefined') return false;
+  const isDarkStored = localStorage.getItem('stp_theme') === 'dark';
+  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  return isDarkStored || (!('stp_theme' in localStorage) && prefersDark);
+}
+
+function getServerSnapshot(): boolean {
+  return false;
+}
+
 export function ThemeToggle() {
-  const [isDark, setIsDark] = useState(false);
+  const isDark = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
-  useEffect(() => {
-    const isDarkStored = localStorage.getItem('stp_theme') === 'dark';
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    if (isDarkStored || (!('stp_theme' in localStorage) && prefersDark)) {
-      setIsDark(true);
-      document.documentElement.classList.add('dark');
-    } else {
-      setIsDark(false);
-      document.documentElement.classList.remove('dark');
-    }
-  }, []);
-
-  const toggleTheme = () => {
-    if (isDark) {
-      document.documentElement.classList.remove('dark');
-      localStorage.setItem('stp_theme', 'light');
-      setIsDark(false);
-    } else {
+  const toggleTheme = useCallback(() => {
+    const nextDark = !isDark;
+    if (nextDark) {
       document.documentElement.classList.add('dark');
       localStorage.setItem('stp_theme', 'dark');
-      setIsDark(true);
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('stp_theme', 'light');
     }
-  };
+    window.dispatchEvent(new Event('storage'));
+  }, [isDark]);
 
   return (
     <button

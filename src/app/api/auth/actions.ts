@@ -24,6 +24,7 @@ import {
 import { sendSignupVerificationEmail, sendPasswordResetEmail } from '@/lib/email/service';
 import { getServerLocale } from '@/lib/i18n/server';
 import { translations } from '@/lib/i18n/translations';
+import { getDefaultDashboardForRole } from '@/config/routes';
 
 // Helper to record audit logs safely
 async function createAuditLog(
@@ -166,7 +167,7 @@ export async function loginAction(
     redirect('/change-password');
   }
 
-  let defaultPath = '/dashboard';
+  let defaultPath = '/applicant';
   if (user.role === 'ADMIN') {
     defaultPath = '/admin';
   } else if (user.role === 'REVIEWER') {
@@ -353,7 +354,7 @@ export async function verifyEmailAction(
 
   // Auto-login user
   await createSession(user.id);
-  redirect('/dashboard');
+  redirect(user.role === 'ADMIN' ? '/admin' : user.role === 'REVIEWER' ? '/reviewer' : '/applicant');
 }
 
 /**
@@ -567,8 +568,12 @@ export async function changePasswordAction(
     },
   });
 
+  // Security hardening: Invalidate all existing sessions and rotate token
+  await invalidateAllUserSessions(user.id);
+  await createSession(user.id);
+
   await createAuditLog('PASSWORD_CHANGED', 'User', user.id, user.role, user.id);
-  redirect('/dashboard');
+  redirect(getDefaultDashboardForRole(user.role));
 }
 
 /**

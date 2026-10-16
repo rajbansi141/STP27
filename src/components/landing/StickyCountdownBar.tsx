@@ -96,7 +96,7 @@ export function StickyCountdownBar({ deadlineIso }: StickyCountdownBarProps) {
               href="/apply"
               className="inline-flex items-center gap-1 px-3.5 py-1 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-stone-950 font-bold text-xs transition-colors shadow-xs"
             >
-              <span>{t.landing.applyStickyCta}</span>
+              <span>{t?.nav?.applyNow || 'Become A Saathi Teacher'}</span>
               <ArrowRight className="h-3.5 w-3.5" />
             </Link>
           ) : (

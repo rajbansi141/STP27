@@ -64,14 +64,8 @@ export async function sendEmail({
         html,
         text: text || html.replace(/<[^>]*>/g, ''),
       });
-    } else {
-      // In development / local testing without SMTP: Log clearly to console
-      console.log('\n================== [EMAIL DISPATCHED] ==================');
-      console.log(`To: ${to}`);
-      console.log(`Subject: ${subject}`);
-      console.log(`Template: ${templateCode || 'Custom'}`);
-      console.log(`Body:\n${text || html.replace(/<[^>]*>/g, '')}`);
-      console.log('========================================================\n');
+    } else if (process.env.NODE_ENV === 'development') {
+      // Intentionally omit sensitive body/tokens from logs
     }
   } catch (err: unknown) {
     status = 'FAILED';

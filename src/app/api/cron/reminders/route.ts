@@ -3,13 +3,12 @@ import { processDeadlineReminders } from '@/lib/email/queue';
 
 export async function GET(request: NextRequest) {
   const authHeader = request.headers.get('authorization');
-  const cronSecret = process.env.CRON_SECRET || 'stp-secret-cron-key-2027';
-
   const providedKey = request.nextUrl.searchParams.get('key');
-  const isAuthorized =
-    authHeader === `Bearer ${cronSecret}` || providedKey === cronSecret;
+  const providedToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : providedKey;
 
-  if (!isAuthorized && process.env.NODE_ENV === 'production') {
+  const cronSecret = process.env.CRON_SECRET || (process.env.NODE_ENV !== 'production' ? 'stp-dev-cron-key' : null);
+
+  if (!cronSecret || providedToken !== cronSecret) {
     return NextResponse.json({ error: 'Unauthorized cron invocation' }, { status: 401 });
   }
 

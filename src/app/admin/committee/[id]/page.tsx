@@ -280,7 +280,7 @@ export default async function CommitteeMemberDetailPage({ params }: MemberDetail
               ) : (
                 member.reviews.map((r) => {
                   const appData = r.application.data as Record<string, any> | null;
-                  const position = appData?.position || 'Teacher Fellow';
+                  const position = appData?.position || 'Saathi Teacher';
 
                   return (
                     <TableRow key={r.id}>

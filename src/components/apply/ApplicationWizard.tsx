@@ -7,7 +7,7 @@ import { useAutoAnimate } from '@formkit/auto-animate/react';
 import { useI18n } from '@/lib/i18n/context';
 import { countWords, MIN_ESSAY_WORDS } from '@/lib/validations/application';
 import { autosaveDraftAction, submitApplicationAction } from '@/app/api/application/actions';
-import { bsToAd, BS_MONTHS_NE, BS_MONTHS_EN } from '@/lib/date/nepali-date';
+import { ManualDobInput } from '@/components/ui/ManualDobInput';
 import {
   CheckCircle2,
   Clock,
@@ -25,6 +25,7 @@ import {
   Loader2,
   Check,
 } from 'lucide-react';
+import { EligibilityChecklist, type EligibilityAnswers } from '@/components/apply/EligibilityChecklist';
 
 interface ApplicationWizardProps {
   userEmail: string;
@@ -55,6 +56,56 @@ export function ApplicationWizard({
   const [isAutosaving, setIsAutosaving] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
+
+  // Check if eligibility should be presented before the user begins filling the form
+  const [showEligibility, setShowEligibility] = useState<boolean>(() => {
+    if (initialDraft?.eligibilityCompleted) return false;
+    if (initialDraft?.currentStep && initialDraft.currentStep > 1) return false;
+    return true;
+  });
+
+  const handleEligibilityComplete = (answers: EligibilityAnswers) => {
+    setFormData((prev) => {
+      const next = {
+        ...prev,
+        eligibilityCompleted: true,
+        eligibilityAnswers: answers,
+      };
+
+      if (answers.qualification) {
+        if (answers.qualification.includes('Undergraduate complete')) {
+          next.highestLevel = "Bachelor's Degree";
+        } else if (answers.qualification.includes('Undergraduate running')) {
+          next.highestLevel = "Bachelor's Degree";
+        } else if (answers.qualification.includes('April 2027')) {
+          next.highestLevel = "Bachelor's Degree";
+        } else if (answers.qualification.includes('Masters complete')) {
+          next.highestLevel = "Master's Degree";
+        } else if (answers.qualification.includes('Masters running')) {
+          next.highestLevel = "Master's Degree";
+        } else if (answers.qualification.includes('PhD')) {
+          next.highestLevel = "Doctorate / PhD";
+        }
+      }
+
+      if (answers.twoYearCommitment) {
+        next.commitment2Years = answers.twoYearCommitment;
+      }
+      if (answers.opportunityDistribution) {
+        next.opportunityDistribution = answers.opportunityDistribution;
+      }
+
+      return next;
+    });
+
+    setShowEligibility(false);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleEligibilitySkip = () => {
+    setShowEligibility(false);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   // Auto-animate ref for repeatable experience list
   const [experienceListRef] = useAutoAnimate<HTMLDivElement>();
@@ -106,13 +157,12 @@ export function ApplicationWizard({
 
     // Section 6: Declaration
     declarationAgreed: false,
+
+    // Eligibility reflection
+    eligibilityCompleted: initialDraft?.eligibilityCompleted || false,
+    eligibilityAnswers: initialDraft?.eligibilityAnswers || null,
   });
 
-  // BS Date Converter helper state
-  const [showBsModal, setShowBsModal] = useState(false);
-  const [bsYear, setBsYear] = useState('2056');
-  const [bsMonth, setBsMonth] = useState('1');
-  const [bsDay, setBsDay] = useState('15');
 
   // File Upload State
   const [uploadingCv, setUploadingCv] = useState(false);
@@ -185,16 +235,6 @@ export function ApplicationWizard({
     }
   };
 
-  // Convert BS to AD helper
-  const handleApplyBsDate = () => {
-    const adDate = bsToAd({
-      year: parseInt(bsYear, 10),
-      month: parseInt(bsMonth, 10),
-      day: parseInt(bsDay, 10),
-    });
-    setFormData((prev) => ({ ...prev, dob: adDate }));
-    setShowBsModal(false);
-  };
 
   // Experience row management
   const addExperienceRow = () => {
@@ -294,6 +334,18 @@ export function ApplicationWizard({
     { id: 6, title: t.apply.steps.review },
   ];
 
+  if (showEligibility) {
+    return (
+      <div className="space-y-6">
+        <EligibilityChecklist
+          onComplete={handleEligibilityComplete}
+          onSkip={handleEligibilitySkip}
+          initialAnswers={(formData.eligibilityAnswers || initialDraft?.eligibilityAnswers) ?? {}}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Top Banner: Bilingual Notice & Estimated Time */}
@@ -305,6 +357,15 @@ export function ApplicationWizard({
           </span>
         </div>
         <div className="flex items-center gap-4 text-stone-500 dark:text-stone-400">
+          <button
+            type="button"
+            onClick={() => setShowEligibility(true)}
+            className="flex items-center gap-1 font-semibold text-emerald-800 dark:text-emerald-300 hover:underline cursor-pointer"
+            title="Review eligibility questionnaire"
+          >
+            <Sparkles className="h-3.5 w-3.5" />
+            <span>{locale === 'ne' ? 'योग्यता जाँच' : 'Check Eligibility'}</span>
+          </button>
           <span className="flex items-center gap-1 font-semibold text-emerald-800 dark:text-emerald-300">
             <Clock className="h-3.5 w-3.5" />
             <span>{t.apply.estimatedTime}</span>
@@ -417,84 +478,14 @@ export function ApplicationWizard({
                     />
                   </div>
 
-                  {/* Date of Birth with BS Helper */}
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="text-xs font-semibold text-stone-700 dark:text-stone-300">
-                        {t.apply.sec1.dob} *
-                      </label>
-                      <button
-                        type="button"
-                        onClick={() => setShowBsModal(!showBsModal)}
-                        className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 hover:underline flex items-center gap-1"
-                      >
-                        <Calendar className="h-3 w-3" />
-                        <span>{t.apply.sec1.bsHelper}</span>
-                      </button>
-                    </div>
-
-                    <input
-                      type="date"
-                      required
-                      value={formData.dob}
-                      onChange={(e) => setFormData({ ...formData, dob: e.target.value })}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-stone-300 dark:border-stone-700 bg-stone-50/50 dark:bg-stone-800/50 text-sm focus:ring-2 focus:ring-emerald-600 focus:outline-none"
-                    />
-
-                    {/* BS Converter Helper Box */}
-                    {showBsModal && (
-                      <div className="mt-2 p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 text-xs space-y-2">
-                        <span className="font-semibold text-emerald-900 dark:text-emerald-200">
-                          {t.apply.sec1.bsHelper}
-                        </span>
-                        <div className="grid grid-cols-3 gap-2">
-                          <div>
-                            <span className="text-[10px] text-stone-500">{t.apply.sec1.bsYear}</span>
-                            <input
-                              type="number"
-                              min="2040"
-                              max="2075"
-                              value={bsYear}
-                              onChange={(e) => setBsYear(e.target.value)}
-                              className="w-full px-2 py-1 rounded bg-white dark:bg-stone-900 border text-xs"
-                            />
-                          </div>
-                          <div>
-                            <span className="text-[10px] text-stone-500">{t.apply.sec1.bsMonth}</span>
-                            <select
-                              value={bsMonth}
-                              onChange={(e) => setBsMonth(e.target.value)}
-                              className="w-full px-2 py-1 rounded bg-white dark:bg-stone-900 border text-xs"
-                            >
-                              {(locale === 'ne' ? BS_MONTHS_NE : BS_MONTHS_EN).map((m, i) => (
-                                <option key={i + 1} value={String(i + 1)}>
-                                  {m}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                          <div>
-                            <span className="text-[10px] text-stone-500">{t.apply.sec1.bsDay}</span>
-                            <input
-                              type="number"
-                              min="1"
-                              max="32"
-                              value={bsDay}
-                              onChange={(e) => setBsDay(e.target.value)}
-                              className="w-full px-2 py-1 rounded bg-white dark:bg-stone-900 border text-xs"
-                            />
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={handleApplyBsDate}
-                          className="px-3 py-1 rounded-lg bg-emerald-700 text-white font-semibold text-xs hover:bg-emerald-800"
-                        >
-                          {t.apply.sec1.applyBs}
-                        </button>
-                      </div>
-                    )}
-                  </div>
+                  {/* Systematic Manual Date of Birth Input with AD/BS Toggle */}
+                  <ManualDobInput
+                    value={formData.dob}
+                    onChange={(adDate) => setFormData({ ...formData, dob: adDate })}
+                    label={t.apply.sec1.dob}
+                    required
+                    locale={locale}
+                  />
 
                   {/* Gender */}
                   <div>
@@ -849,7 +840,7 @@ export function ApplicationWizard({
                             required
                             value={exp.role}
                             onChange={(e) => updateExperienceField(idx, 'role', e.target.value)}
-                            placeholder="e.g. Volunteer Teacher / Project Assistant / NA"
+                            placeholder="e.g. Volunteer Saathi Teacher / Project Assistant / NA"
                             className="w-full px-3 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-900 text-xs focus:ring-2 focus:ring-emerald-600"
                           />
                         </div>

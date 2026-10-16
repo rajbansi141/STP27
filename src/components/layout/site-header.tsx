@@ -143,10 +143,19 @@ export function SiteHeader({ role, deadlineDate }: SiteHeaderProps) {
 
     if (segment === 'admin') label = t?.common?.adminPortal || 'Admin';
     else if (segment === 'reviewer') label = t?.common?.reviewQueue || 'Reviewer';
-    else if (segment === 'applicant') label = 'Applicant';
-    else if (segment === 'committee') label = t?.nav?.committee || 'Selection Committee';
-    else if (segment === 'activity') label = t?.nav?.reviewerActivity || 'Activity';
-    else if (segment === 'settings') label = t?.nav?.settings || 'Settings';
+    else if (segment === 'applicant') label = locale === 'ne' ? 'आवेदक' : 'Applicant';
+    else if (segment === 'candidates') label = locale === 'ne' ? 'उम्मेदवारहरू' : 'Candidates';
+    else if (segment === 'cohorts') label = locale === 'ne' ? 'कोहोर्टहरू' : 'Cohorts';
+    else if (segment === 'asc') label = locale === 'ne' ? 'ASC व्यवस्थापन' : 'ASC Hub';
+    else if (segment === 'templates') label = locale === 'ne' ? 'इमेल ढाँचाहरू' : 'Templates';
+    else if (segment === 'users') label = locale === 'ne' ? 'प्रयोगकर्ता खाताहरू' : 'Users';
+    else if (segment === 'audit') label = locale === 'ne' ? 'अडिट लगहरू' : 'Audit Logs';
+    else if (segment === 'committee') label = t?.nav?.committee || (locale === 'ne' ? 'छनोट समिति' : 'Selection Committee');
+    else if (segment === 'activity') label = t?.nav?.reviewerActivity || (locale === 'ne' ? 'समीक्षक गतिविधि' : 'Activity');
+    else if (segment === 'settings') label = t?.nav?.settings || (locale === 'ne' ? 'सेटिङहरू' : 'Settings');
+    else if (segment === 'profile') label = locale === 'ne' ? 'मेरो प्रोफाइल' : 'Profile';
+    else if (segment === 'apply') label = locale === 'ne' ? 'आवेदन फारम' : 'Application';
+    else if (segment === 'status') label = locale === 'ne' ? 'आवेदन स्थिति' : 'Status';
     else if (segment === 'pipeline') label = t?.nav?.pipeline || 'Pipeline';
     else if (segment === 'positions') label = t?.nav?.positions || 'Positions';
 

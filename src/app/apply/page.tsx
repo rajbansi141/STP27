@@ -6,6 +6,7 @@ import prisma from '@/lib/prisma';
 import { ApplicationWizard } from '@/components/apply/ApplicationWizard';
 import { AlertCircle, Lock } from 'lucide-react';
 import Link from 'next/link';
+import { getDefaultDashboardForRole } from '@/config/routes';
 
 export default async function ApplyPage() {
   const user = await requireAuth('/apply');
@@ -30,10 +31,10 @@ export default async function ApplyPage() {
           </p>
           <div className="pt-2">
             <Link
-              href="/dashboard"
+              href={getDefaultDashboardForRole(user.role)}
               className="px-4 py-2 rounded-xl bg-emerald-700 text-white font-semibold text-xs hover:bg-emerald-800 transition-colors"
             >
-              Go to Dashboard
+              {locale === 'ne' ? 'ड्यासबोर्डमा जानुहोस्' : 'Go to Dashboard'}
             </Link>
           </div>
         </div>
@@ -57,7 +58,7 @@ export default async function ApplyPage() {
           </p>
           <div className="pt-2">
             <Link
-              href="/dashboard"
+              href="/applicant"
               className="px-4 py-2 rounded-xl bg-emerald-700 text-white font-semibold text-xs hover:bg-emerald-800 transition-colors"
             >
               Back to Dashboard
@@ -73,8 +74,8 @@ export default async function ApplyPage() {
     where: { applicantId: user.id, year: deadlineStatus.cohortYear },
   });
 
-  // If already submitted, redirect to confirmation (locked, no editing)
-  if (existingApp && existingApp.status === 'SUBMITTED') {
+  // If already submitted (any active post-submission stage), redirect to confirmation
+  if (existingApp && existingApp.status !== 'DRAFT') {
     redirect(`/apply/confirmation?ref=${existingApp.refNo}`);
   }
 

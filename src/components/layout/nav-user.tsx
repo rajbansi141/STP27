@@ -114,19 +114,43 @@ export function NavUser({ user }: NavUserProps) {
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem>
-                <Link href="/profile" className="flex items-center w-full">
-                  <UserIcon className="mr-2 h-4 w-4" />
-                  {t?.nav?.profile || 'Account Profile'}
-                </Link>
-              </DropdownMenuItem>
-              {user.role === 'ADMIN' && (
-                <DropdownMenuItem>
-                  <Link href="/admin/settings" className="flex items-center w-full">
-                    <Shield className="mr-2 h-4 w-4" />
-                    {t?.nav?.settings || 'System Settings'}
+              <DropdownMenuItem
+                render={
+                  <Link href="/profile" className="flex items-center w-full">
+                    <UserIcon className="mr-2 h-4 w-4" />
+                    <span>{t?.nav?.profile || 'Account Profile'}</span>
                   </Link>
-                </DropdownMenuItem>
+                }
+              />
+              {user.role === 'ADMIN' && (
+                <DropdownMenuItem
+                  render={
+                    <Link href="/admin/settings" className="flex items-center w-full">
+                      <Shield className="mr-2 h-4 w-4" />
+                      <span>{t?.nav?.settings || 'System Settings'}</span>
+                    </Link>
+                  }
+                />
+              )}
+              {user.role === 'REVIEWER' && (
+                <DropdownMenuItem
+                  render={
+                    <Link href="/reviewer" className="flex items-center w-full">
+                      <BadgeCheck className="mr-2 h-4 w-4" />
+                      <span>{t?.nav?.evaluations || 'Evaluation Queue'}</span>
+                    </Link>
+                  }
+                />
+              )}
+              {user.role === 'APPLICANT' && (
+                <DropdownMenuItem
+                  render={
+                    <Link href="/apply" className="flex items-center w-full">
+                      <BadgeCheck className="mr-2 h-4 w-4" />
+                      <span>{t?.nav?.myApplication || 'My Application'}</span>
+                    </Link>
+                  }
+                />
               )}
             </DropdownMenuGroup>
             <DropdownMenuSeparator />

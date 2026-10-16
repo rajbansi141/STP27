@@ -12,6 +12,46 @@ const ALLOWED_MIME_TYPES = [
 const ALLOWED_EXTENSIONS = ['.pdf', '.doc', '.docx'];
 
 /**
+ * Verifies file magic bytes (binary file signatures) to prevent MIME-spoofing and executable uploads.
+ */
+function verifyMagicBytes(buffer: Buffer, ext: string): boolean {
+  if (buffer.length < 5) return false;
+
+  // PDF signature: %PDF- (0x25 0x50 0x44 0x46 0x2D)
+  if (ext === '.pdf') {
+    return (
+      buffer[0] === 0x25 &&
+      buffer[1] === 0x50 &&
+      buffer[2] === 0x44 &&
+      buffer[3] === 0x46 &&
+      buffer[4] === 0x2d
+    );
+  }
+
+  // DOCX / ZIP package signature: PK\x03\x04 (0x50 0x4B 0x03 0x04)
+  if (ext === '.docx') {
+    return (
+      buffer[0] === 0x50 &&
+      buffer[1] === 0x4b &&
+      buffer[2] === 0x03 &&
+      buffer[3] === 0x04
+    );
+  }
+
+  // DOC (legacy Microsoft Word OLE2 Compound Document): 0xD0 0xCF 0x11 0xE0
+  if (ext === '.doc') {
+    return (
+      buffer[0] === 0xd0 &&
+      buffer[1] === 0xcf &&
+      buffer[2] === 0x11 &&
+      buffer[3] === 0xe0
+    );
+  }
+
+  return false;
+}
+
+/**
  * Virus scan hook placeholder for file uploads
  */
 async function scanFileForViruses(buffer: Buffer): Promise<{ isClean: boolean; reason?: string }> {
@@ -55,6 +95,14 @@ export async function POST(req: NextRequest) {
 
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
+
+    // Binary Magic Bytes Signature Verification
+    if (!verifyMagicBytes(buffer, ext)) {
+      return NextResponse.json(
+        { error: 'Invalid file signature: Content does not match genuine PDF or Word document format.' },
+        { status: 400 }
+      );
+    }
 
     // Virus scan hook verification
     const scan = await scanFileForViruses(buffer);

@@ -4,6 +4,7 @@ import { requireAuth } from '@/lib/auth/rbac';
 import { getServerTranslations } from '@/lib/i18n/server';
 import prisma from '@/lib/prisma';
 import { ConfirmationCard } from './ConfirmationCard';
+import { SubmittedApplicationDossier } from '@/components/applicant/SubmittedApplicationDossier';
 import { CheckCircle2, Lock, ArrowLeft, Download, ShieldCheck } from 'lucide-react';
 
 interface ConfirmationPageProps {
@@ -21,7 +22,7 @@ export default async function ConfirmationPage({ searchParams }: ConfirmationPag
   const app = await prisma.application.findFirst({
     where: {
       applicantId: user.id,
-      status: 'SUBMITTED',
+      status: { not: 'DRAFT' },
       ...(params.ref ? { refNo: params.ref } : {}),
     },
     include: {
@@ -31,13 +32,13 @@ export default async function ConfirmationPage({ searchParams }: ConfirmationPag
   });
 
   if (!app) {
-    redirect('/dashboard');
+    redirect('/applicant');
   }
 
   const appData = app.data ? (typeof app.data === 'string' ? JSON.parse(app.data) : app.data) : {};
 
   return (
-    <div className="flex-1 py-12 px-4 sm:px-6 lg:px-8 max-w-3xl mx-auto w-full space-y-6">
+    <div className="flex-1 py-8 px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto w-full space-y-6">
       {/* Success Hero Card */}
       <div className="bg-white dark:bg-stone-900 border border-emerald-200 dark:border-emerald-800/80 rounded-2xl p-6 sm:p-10 shadow-xl text-center space-y-6">
         <div className="mx-auto h-16 w-16 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 flex items-center justify-center shadow-xs">
@@ -83,9 +84,9 @@ export default async function ConfirmationPage({ searchParams }: ConfirmationPag
         </div>
 
         {/* Action Buttons */}
-        <div className="pt-4 flex flex-col sm:flex-row gap-3 justify-center">
+        <div className="pt-2 flex flex-col sm:flex-row gap-3 justify-center">
           <Link
-            href="/dashboard"
+            href="/applicant"
             className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-semibold text-xs shadow-md transition-all"
           >
             <ArrowLeft className="h-4 w-4" />
@@ -93,6 +94,18 @@ export default async function ConfirmationPage({ searchParams }: ConfirmationPag
           </Link>
         </div>
       </div>
+
+      {/* Complete Submitted Dossier Breakdown */}
+      <SubmittedApplicationDossier
+        refNo={app.refNo}
+        applicantName={app.applicant.name}
+        applicantEmail={app.applicant.email}
+        submittedAt={app.submittedAt ? app.submittedAt.toISOString() : null}
+        stage={app.stage}
+        status={app.status}
+        data={appData}
+        locale={locale}
+      />
     </div>
   );
 }

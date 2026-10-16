@@ -1,5 +1,4 @@
 import crypto from 'node:crypto';
-import prisma from '@/lib/prisma';
 import type { Prisma } from '@prisma/client';
 
 // Alphabet excluding confusing characters: I, O, 0, 1

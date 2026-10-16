@@ -32,7 +32,7 @@ export async function autosaveDraftAction(
       return { success: false, message: 'Unauthorized' };
     }
 
-    const { cohortYear } = await getApplicationDeadlineStatus();
+    const { cohortYear, cohortId } = await getApplicationDeadlineStatus();
 
     // Check existing application
     const existing = await prisma.application.findFirst({
@@ -57,6 +57,7 @@ export async function autosaveDraftAction(
         where: { id: existing.id },
         data: {
           draftData: JSON.stringify(draftData),
+          cohortId: cohortId || existing.cohortId || undefined,
         },
       });
     } else {
@@ -67,6 +68,7 @@ export async function autosaveDraftAction(
           refNo: tempRefNo,
           applicantId: user.id,
           year: cohortYear,
+          cohortId: cohortId || undefined,
           status: 'DRAFT',
           stage: 'APPLICATION',
           draftData: JSON.stringify(draftData),
@@ -147,6 +149,7 @@ export async function submitApplicationAction(
             status: 'SUBMITTED',
             stage: 'APPLICATION',
             submittedAt: new Date(),
+            cohortId: deadlineStatus.cohortId || existing.cohortId || undefined,
             data: JSON.stringify(validated.data),
             draftData: undefined,
           },
@@ -158,6 +161,7 @@ export async function submitApplicationAction(
             seq,
             applicantId: user.id,
             year: cohortYear,
+            cohortId: deadlineStatus.cohortId || undefined,
             status: 'SUBMITTED',
             stage: 'APPLICATION',
             submittedAt: new Date(),
@@ -273,3 +277,77 @@ export async function submitApplicationAction(
     return { success: false, message: 'Failed to submit application. Please try again.' };
   }
 }
+
+/**
+ * Allows an applicant to submit their response to a clarification request sent by the committee.
+ * RBAC: APPLICANT only.
+ */
+export async function submitApplicantClarificationAction(
+  responseMessage: string
+): Promise<{ success: boolean; message: string }> {
+  try {
+    const user = await getCurrentUser();
+    if (!user || user.role !== 'APPLICANT') {
+      return { success: false, message: 'Unauthorized. Please sign in as an applicant.' };
+    }
+
+    if (!responseMessage || !responseMessage.trim()) {
+      return { success: false, message: 'Clarification response cannot be empty.' };
+    }
+
+    const application = await prisma.application.findFirst({
+      where: { applicantId: user.id, status: { not: 'DRAFT' } },
+    });
+
+    if (!application) {
+      return { success: false, message: 'Application not found.' };
+    }
+
+    const currentData = typeof application.data === 'string'
+      ? JSON.parse(application.data)
+      : application.data || {};
+
+    const updatedClarification = {
+      ...(currentData.clarificationRequest || {}),
+      response: responseMessage.trim(),
+      respondedAt: new Date().toISOString(),
+    };
+
+    const updatedData = {
+      ...currentData,
+      clarificationRequest: updatedClarification,
+    };
+
+    await prisma.application.update({
+      where: { id: application.id },
+      data: {
+        data: JSON.stringify(updatedData),
+      },
+    });
+
+    // Notify admins
+    const admins = await prisma.user.findMany({
+      where: { role: 'ADMIN', isActive: true },
+      select: { id: true },
+    });
+
+    for (const admin of admins) {
+      await prisma.notification.create({
+        data: {
+          userId: admin.id,
+          title: `Clarification Submitted / थप विवरण प्राप्त: ${application.refNo}`,
+          body: `Candidate ${user.name} (${application.refNo}) has responded to the committee's clarification inquiry.`,
+        },
+      });
+    }
+
+    return {
+      success: true,
+      message: 'Your clarification has been submitted to the Selection Committee.',
+    };
+  } catch (err) {
+    console.error('Clarification submit error:', err);
+    return { success: false, message: 'Server error submitting clarification.' };
+  }
+}
+

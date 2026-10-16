@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { useI18n } from '@/lib/i18n';
+import { buildSanitizedCsv, downloadCsv } from '@/lib/csv';
 
 export interface AuditItem {
   id: string;
@@ -51,23 +52,11 @@ export function ActivityTimeline({ logs, memberName }: ActivityTimelineProps) {
       l.action,
       l.at,
       l.ip || '—',
-      `"${(l.meta || '').replace(/"/g, '""')}"`,
+      l.meta || '',
     ]);
 
-    const csvContent =
-      'data:text/csv;charset=utf-8,' +
-      [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
-
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute(
-      'download',
-      `audit_log_${memberName.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.csv`
-    );
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const csv = buildSanitizedCsv(headers, rows);
+    downloadCsv(`audit_log_${memberName.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.csv`, csv);
   };
 
   const getActionIcon = (action: string) => {

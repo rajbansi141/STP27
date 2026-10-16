@@ -66,6 +66,9 @@ model Application {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
+  cohortId    String?
+  cohort      Cohort?   @relation(fields: [cohortId], references: [id], onDelete: SetNull)
+
   histories   StageHistory[]
   reviews     Review[]
   assignments ReviewerAssignment[]
@@ -74,6 +77,28 @@ model Application {
   @@index([refNo])
   @@index([stage])
   @@index([status])
+  @@index([cohortId])
+}
+
+model Cohort {
+  id               String        @id @default(cuid())
+  code             String        @unique // e.g. "STP27", "STP28"
+  nameEn           String        // "Saathi Teachers Programme 2027"
+  nameNe           String        // "साथी शिक्षक कार्यक्रम २०२७"
+  year             Int           @unique // 2027, 2028
+  status           String        @default("ACTIVE") // DRAFT, ACTIVE, COMPLETED, ARCHIVED
+  isCurrent        Boolean       @default(false)
+  description      String?
+  applicationOpen  DateTime?
+  applicationClose DateTime?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  applications     Application[]
+
+  @@index([status])
+  @@index([isCurrent])
+  @@index([year])
 }
 
 model Stage {
@@ -215,6 +240,7 @@ model Settings {
   deadline   DateTime
   cohortYear Int      @default(2027)
   cycleLabel String   @default("Saathi Teachers Programme (STP) 2027")
+  ascConfig  Json?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 }
