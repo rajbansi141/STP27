@@ -195,7 +195,7 @@ export function AdminUsersTable({ users, currentAdminId }: AdminUsersTableProps)
 
   // Statistics Computations
   const stats = useMemo(() => {
-    let total = users.length;
+    const total = users.length;
     let active = 0;
     let admins = 0;
     let reviewers = 0;
